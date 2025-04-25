@@ -1,0 +1,28 @@
+cabal-version: 1.12
+
+name:           pq-verification
+version:        0.1.0.0
+description:    This project is a demonstration of how to use Liquid Haskell to verify properties of a priority queue implementation.
+homepage:
+bug-reports:
+author:         Mehran Shahidi
+maintainer:     m.mehrashahidi@gmil.com
+copyright:      2025 Mehran.shahidi
+license:        MIT
+license-file:   LICENSE
+build-type:     Simple
+
+library
+  exposed-modules:
+      PriorityQueue.Lib
+  hs-source-dirs:
+      src
+  build-depends:
+      liquid-prelude,
+      liquid-vector,
+      liquidhaskell,
+      base,
+      containers,
+      vector
+  default-language: Haskell2010
+  ghc-options:  -fplugin=LiquidHaskell 

@@ -1,0 +1,25 @@
+resolver: nightly-2025-04-02
+packages:
+  - .
+
+extra-deps:
+  - rest-rewrite-0.4.3
+  - smtlib-backends-0.3
+  - smtlib-backends-process-0.3
+  - store-0.7.19
+  - store-core-0.4.4.6
+  - git: https://github.com/ucsd-progsys/liquidhaskell
+    commit: dd998ace0b7784da669f377c6087c87f35ff0210 
+    subdirs:
+      - .
+      - liquid-prelude
+      - liquid-vector
+      - liquidhaskell-boot
+  - git: https://github.com/ucsd-progsys/liquid-fixpoint
+    commit: fa855d1c77a2fbf18aa53b56d02f9807a5d01a3b
+
+allow-newer: true
+nix:
+  pure: true
+  enable: true
+  packages: [cacert, git, hostname, z3]
