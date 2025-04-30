@@ -15,6 +15,7 @@ build-type:     Simple
 library
   exposed-modules:
       PriorityQueue.Lib
+      PriorityQueue.Example
   hs-source-dirs:
       src
   build-depends:
