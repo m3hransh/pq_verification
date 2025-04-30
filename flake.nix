@@ -15,7 +15,7 @@
         buildInputs = with pkgs; [
           z3
           stack
-          haskell.packages."${compilerVersion}".ghcid
+          haskell.packages."${"ghc948"}".ghcid
           haskell.packages."${compilerVersion}".haskell-language-server
           cabal-install
           haskell.packages.${compilerVersion}.ghc

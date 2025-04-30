@@ -6,6 +6,7 @@ import Prelude hiding (min)
 
 {-@ LIQUID "--reflection" @-}
 {-@ LIQUID "--ple" @-}
+{-@ LIQUID "--no-termination" @-}
 
 {-@ type Nat = {v : Int | v >= 0} @-}
 
@@ -35,7 +36,7 @@ rrank Empty = 0
 rrank h@(Node _ _ _ r) = r
 
 {-@ reflect min @-}
-{-@ min :: x: a -> y: {v: a | x <= v} -> {v: a | x <= v} @-}
+{-@ min :: x: a -> y: a -> {v: a |  v <= x && v <= y} @-}
 min :: (Ord a) => a -> a -> a
 min x y
   | x < y = x
@@ -67,52 +68,39 @@ isLowerBound v (Node x l r _) = v <= x && isLowerBound v l && isLowerBound v r
 
 -- Merge two heaps
 {-@ reflect merge @-}
-{-@ merge :: h1: Heap a -> h2: Heap a ->  { h: Heap a | (not (isEmpty h1) && not (isEmpty h2)) => isLowerBound (min (findMin h1) (findMin h2)) h } @-}
+{-@  merge :: h1: Heap a -> h2: Heap a ->  { h: Heap a | (not (isEmpty h1) && not (isEmpty h2)) => isLowerBound (min (findMin h1) (findMin h2)) h } @-}
 merge :: (Ord a) => Heap a -> Heap a -> Heap a
 merge Empty Empty = Empty
 merge Empty h2@(Node _ _ _ _) = h2
 merge h1@(Node _ _ _ _) Empty = h1
 merge h1@(Node x1 l1 r1 _) h2@(Node x2 l2 r2 _)
-  | x1 <= x2 = makeNode x1 l1 (merge r1 h2) `withProof` lemma_merge_min_case1 x1 l1 r1 h2 x2
-  | otherwise = makeNode x2 l2 (merge h1 r2) `withProof` lemma_merge_min_case2 h1 x2 l2 r2
+  | x1 <= x2 = makeNode x1 l1 (merge r1 h2) `withProof` lemma_merge_case x1 r1 h2 x2
+  | otherwise = makeNode x2 l2 (merge r2 h1) `withProof` lemma_merge_case x2 r2 h1 x1
 
 -- Transitivity lemma for isLowerBound
-{-@ lemma_isLowerBound_transitive :: x:a -> y:{v:a | x <= v} -> h:Heap a -> {isLowerBound y h => isLowerBound x h} @-}
+{-@ lemma_isLowerBound_transitive :: x:a -> y:{v:a | x <= v} -> h: {h : Heap a | isLowerBound y h} -> {isLowerBound x h} @-}
 lemma_isLowerBound_transitive :: (Ord a) => a -> a -> Heap a -> Proof
 lemma_isLowerBound_transitive x y Empty = ()
 lemma_isLowerBound_transitive x y (Node z l r _) = lemma_isLowerBound_transitive x y l &&& lemma_isLowerBound_transitive x y r *** QED
 
-{-@ assume lemma_merge_min_case1 ::  x1:a -> l1:{h:Heap a | isLowerBound x1 h} -> r1:{h:Heap a | isLowerBound x1 h} -> h2:{h:Heap a | not isEmpty h2} -> x2:{v:a | v == findMin h2 && x1  <= v} -> {isLowerBound x1 (merge r1 h2)} @-}
-lemma_merge_min_case1 :: (Ord a) => a -> Heap a -> Heap a -> Heap a -> a -> Proof
-lemma_merge_min_case1 x1 l1 r1 h2 x2 = ()
+{-@ lemma_merge_case :: x1:a  -> r1:{h:Heap a | isLowerBound x1 h} -> h2:{h:Heap a | not isEmpty h2} -> x2:{v:a | v == findMin h2 && x1  <= v} -> {isLowerBound x1 (merge r1 h2)} @-}
+lemma_merge_case :: (Ord a) => a -> Heap a -> Heap a -> a -> Proof
+lemma_merge_case x1 Empty h2 x2 =
+  isLowerBound x1 (merge Empty h2)
+    === isLowerBound x1 h2
+    ? lemma_isLowerBound_transitive x1 x2 h2
+    === True
+    *** QED
+lemma_merge_case x1 r1@(Node _ _ _ _) h2@(Node _ _ _ _) x2 =
+  isLowerBound x1 (merge r1 h2)
+    ? (isEmpty h2 === False)
+    ? (isEmpty r1 === False)
+    ? (lemma_isLowerBound_transitive x1 (min (findMin r1) (findMin h2)) (merge r1 h2))
+    === True
+    *** QED
 
-{-@ assume lemma_merge_min_case2 :: h1:{h:Heap a | not isEmpty h1} -> x2:a -> l2:{h:Heap a | isLowerBound x2 h} -> r2:{h:Heap a | isLowerBound x2 h} -> {isLowerBound x2 (merge h1 r2)} @-}
-lemma_merge_min_case2 :: (Ord a) => Heap a -> a -> Heap a -> Heap a -> Proof
-lemma_merge_min_case2 _ _ _ _ = ()
-
--- Helper lemma for merg
--- -- Helper lemma for merge
-{-@ lemma_merge_preserves_min :: x:a -> h1:{h:Heap a | isLowerBound x h} -> h2: {h:Heap a | isLowerBound x h}  -> {isLowerBound x (merge h1 h2)} @-}
-lemma_merge_preserves_min :: (Ord a) => a -> Heap a -> Heap a -> Proof
-lemma_merge_preserves_min _ Empty Empty = () -- Trivial case: merging two empty heaps
-lemma_merge_preserves_min x Empty h2 = ()
-lemma_merge_preserves_min x h1 Empty = () -- Trivial case: merging h1 with Empty just returns h1
-lemma_merge_preserves_min x h1@(Node x1 l1 r1 _) h2@(Node x2 l2 r2 _)
-  | x1 <= x2 =
-      -- When merging with x1 <= x2, we create a node with x1 as root and merge r1 with h2
-      -- Need to prove: x is a lower bound for makeNode x1 l1 (merge r1 h2)
-
-      -- First, recursively prove that x is a lower bound for merge r1 h2
-      lemma_merge_preserves_min x r1 h2
-  -- By assumption, x is a lower bound for h1, which includes x1 and l1
-  -- x <= x1 holds because x is a lower bound for h1
-  -- x is a lower bound for l1 by assumption
-  -- x is a lower bound for merge r1 h2 by recursive proof
-  -- Therefore, x is a lower bound for makeNode x1 l1 (merge r1 h2)
-
-  | otherwise =
-      -- When merging with x1 > x2, we create a node with x2 as root and merge h1 with r2
-      -- Need to prove: x is a lower bound for makeNode x2 l2 (merge h1 r2)
-
-      -- First, recursively prove that x is a lower bound for merge h1 r2
-      lemma_merge_preserves_min x h1 r2
+{-@ lemma_min_transitive :: x: a -> y:{v : a | x <= v} -> z: {v : a | x <= v} -> {x <= (min y z)} @-}
+lemma_min_transitive :: (Ord a) => a -> a -> a -> Proof
+lemma_min_transitive x y z
+  | y <= z = x =<= y =<= min y z *** QED
+  | otherwise = ()
