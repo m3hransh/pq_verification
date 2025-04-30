@@ -75,7 +75,7 @@ merge Empty h2@(Node _ _ _ _) = h2
 merge h1@(Node _ _ _ _) Empty = h1
 merge h1@(Node x1 l1 r1 _) h2@(Node x2 l2 r2 _)
   | x1 <= x2 = makeNode x1 l1 ((merge r1 h2) `withProof` lemma_merge_case x1 r1 h2 x2)
-  | otherwise = makeNode x2 l2 ((merge r2 h1) `withProof` lemma_merge_case x2 r2 h1 x1)
+  | otherwise = makeNode x2 l2 ((merge h1 r2) `withProof` lemma_merge_case2 x2 r2 h1 x1)
 
 insert :: (Ord a) => a -> Heap a -> Heap a
 insert x h = merge (Node x Empty Empty 1) h
@@ -99,6 +99,22 @@ lemma_merge_case x1 r1@(Node _ _ _ _) h2@(Node _ _ _ _) x2 =
     ? (isEmpty h2 === False)
     ? (isEmpty r1 === False)
     ? (lemma_isLowerBound_transitive x1 (min (findMin r1) (findMin h2)) (merge r1 h2))
+    === True
+    *** QED
+
+{-@ lemma_merge_case2 :: x1 : a  -> r1 : {h : Heap a | isLowerBound x1 h} -> h2 : {h : Heap a | not (isEmpty h)} -> x2 : { v : a | v == (findMin h2) && x1  <= v} -> {isLowerBound x1 (merge h2 r1)} @-}
+lemma_merge_case2 :: (Ord a) => a -> Heap a -> Heap a -> a -> Proof
+lemma_merge_case2 x1 Empty h2 x2 =
+  isLowerBound x1 (merge Empty h2)
+    === isLowerBound x1 h2
+    ? lemma_isLowerBound_transitive x1 x2 h2
+    === True
+    *** QED
+lemma_merge_case2 x1 r1@(Node _ _ _ _) h2@(Node _ _ _ _) x2 =
+  isLowerBound x1 (merge h2 r1)
+    ? (isEmpty h2 === False)
+    ? (isEmpty r1 === False)
+    ? (lemma_isLowerBound_transitive x1 (min (findMin h2) (findMin r1)) (merge h2 r1))
     === True
     *** QED
 
