@@ -6,7 +6,6 @@ import Prelude hiding (min)
 
 {-@ LIQUID "--reflection" @-}
 {-@ LIQUID "--ple" @-}
-{-@ LIQUID "--no-termination" @-}
 
 {-@ type Nat = {v : Int | v >= 0} @-}
 
@@ -61,14 +60,14 @@ findMin :: (Ord a) => Heap a -> a
 findMin (Node x l r rank) = x
 
 {-@ reflect isLowerBound @-}
-{-@ isLowerBound :: Ord a => a -> Heap a -> Bool @-}
+{-@ isLowerBound :: Ord a => a -> h: Heap a -> Bool / [size h, 0] @-}
 isLowerBound :: (Ord a) => a -> Heap a -> Bool
 isLowerBound _ Empty = True
 isLowerBound v (Node x l r _) = v <= x && isLowerBound v l && isLowerBound v r
 
 -- Merge two heaps
 {-@ reflect merge @-}
-{-@  merge :: h1: Heap a -> h2: Heap a ->  { h: Heap a | (not (isEmpty h1) && not (isEmpty h2)) => isLowerBound (min (findMin h1) (findMin h2)) h } @-}
+{-@  merge :: h1: Heap a -> h2: Heap a ->  { h: Heap a | (not (isEmpty h1) && not (isEmpty h2)) => isLowerBound (min (findMin h1) (findMin h2)) h } / [size h1, size h2, 0] @-}
 merge :: (Ord a) => Heap a -> Heap a -> Heap a
 merge Empty Empty = Empty
 merge Empty h2@(Node _ _ _ _) = h2
@@ -81,17 +80,22 @@ insert :: (Ord a) => a -> Heap a -> Heap a
 insert x h = merge (Node x Empty Empty 1) h
 
 -- Transitivity lemma for isLowerBound
-{-@ lemma_isLowerBound_transitive :: x:a -> y:{v:a | x <= v} -> h: {h : Heap a | isLowerBound y h} -> {isLowerBound x h} @-}
+{-@ lemma_isLowerBound_transitive :: x:a -> y:{v:a | x <= v} -> h: {h : Heap a | isLowerBound y h} -> {isLowerBound x h} / [size h, 0] @-}
 lemma_isLowerBound_transitive :: (Ord a) => a -> a -> Heap a -> Proof
 lemma_isLowerBound_transitive x y Empty = ()
 lemma_isLowerBound_transitive x y (Node z l r _) = lemma_isLowerBound_transitive x y l &&& lemma_isLowerBound_transitive x y r *** QED
 
-{-@ lemma_merge_case :: x1 : a  -> r1 : {h : Heap a | isLowerBound x1 h} -> h2 : {h : Heap a | not (isEmpty h)} -> x2 : { v : a | v == (findMin h2) && x1  <= v} -> {isLowerBound x1 (merge r1 h2)} @-}
+{-@ lemma_merge_case :: x1 : a  -> r1 : {h : Heap a | isLowerBound x1 h} -> h2 : {h : Heap a | not (isEmpty h)} -> x2 : { v : a | v == (findMin h2) && x1  <= v} -> {isLowerBound x1 (merge r1 h2)} / [size r1, size h2 , 1]@-}
 lemma_merge_case :: (Ord a) => a -> Heap a -> Heap a -> a -> Proof
 lemma_merge_case x1 Empty h2 x2 =
   isLowerBound x1 (merge Empty h2)
     === isLowerBound x1 h2
     ? lemma_isLowerBound_transitive x1 x2 h2
+    === True
+    *** QED
+lemma_merge_case x1 h1 Empty x2 =
+  isLowerBound x1 (merge h1 Empty)
+    === isLowerBound x1 h1
     === True
     *** QED
 lemma_merge_case x1 r1@(Node _ _ _ _) h2@(Node _ _ _ _) x2 =
@@ -102,7 +106,7 @@ lemma_merge_case x1 r1@(Node _ _ _ _) h2@(Node _ _ _ _) x2 =
     === True
     *** QED
 
-{-@ lemma_merge_case2 :: x1 : a  -> r1 : {h : Heap a | isLowerBound x1 h} -> h2 : {h : Heap a | not (isEmpty h)} -> x2 : { v : a | v == (findMin h2) && x1  <= v} -> {isLowerBound x1 (merge h2 r1)} @-}
+{-@ lemma_merge_case2 :: x1 : a  -> r1 : {h : Heap a | isLowerBound x1 h} -> h2 : {h : Heap a | not (isEmpty h)} -> x2 : { v : a | v == (findMin h2) && x1  <= v} -> {isLowerBound x1 (merge h2 r1)} / [size h2 , size r1, 1] @-}
 lemma_merge_case2 :: (Ord a) => a -> Heap a -> Heap a -> a -> Proof
 lemma_merge_case2 x1 Empty h2 x2 =
   isLowerBound x1 (merge Empty h2)
@@ -110,13 +114,20 @@ lemma_merge_case2 x1 Empty h2 x2 =
     ? lemma_isLowerBound_transitive x1 x2 h2
     === True
     *** QED
-lemma_merge_case2 x1 r1@(Node _ _ _ _) h2@(Node _ _ _ _) x2 =
-  isLowerBound x1 (merge h2 r1)
-    ? (isEmpty h2 === False)
-    ? (isEmpty r1 === False)
-    ? (lemma_isLowerBound_transitive x1 (min (findMin h2) (findMin r1)) (merge h2 r1))
+lemma_merge_case2 x1 h1 Empty x2 =
+  isLowerBound x1 (merge h1 Empty)
+    === isLowerBound x1 h1
     === True
     *** QED
+lemma_merge_case2 x1 r1@(Node _ _ _ _) h2@(Node _ _ _ _) x2 =
+  isLowerBound x1 (merged)
+    ? (isEmpty h2 === False)
+    ? (isEmpty r1 === False)
+    ? (lemma_isLowerBound_transitive x1 (min (findMin h2) (findMin r1)) (merged))
+    === True
+    *** QED
+ where
+  merged = merge h2 r1
 
 {-@ lemma_min_transitive :: x: a -> y:{v : a | x <= v} -> z: {v : a | x <= v} -> {x <= (min y z)} @-}
 lemma_min_transitive :: (Ord a) => a -> a -> a -> Proof
