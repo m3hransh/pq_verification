@@ -14,7 +14,7 @@ build-type:     Simple
 
 library
   exposed-modules:
-      PriorityQueue.Lib
+      PriorityQueue.LeftistHeap
       PriorityQueue.Example
   hs-source-dirs:
       src

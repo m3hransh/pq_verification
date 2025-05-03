@@ -1,6 +1,6 @@
 module PriorityQueue.Example where
 
-import PriorityQueue.Lib
+import PriorityQueue.LeftistHeap
 import Prelude hiding (min)
 
 {-@ LIQUID "--reflection" @-}
