@@ -12,7 +12,7 @@ import Prelude hiding (min)
 data Heap a = Empty | Node {value :: a, left :: (Heap a), right :: (Heap a), rank :: Int}
   deriving (Show)
 
-{-@ data Heap [size] a = Empty
+{-@ data Heap a = Empty
             | Node { value :: a
                     , left  :: {h : Heap a | isLowerBound value h}
                     , right :: {v : Heap a  | isLowerBound value v && rrank v <= rrank left }

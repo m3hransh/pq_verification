@@ -16,6 +16,7 @@ library
   exposed-modules:
       PriorityQueue.LeftistHeap
       PriorityQueue.Example
+      PriorityQueue.BionomialHeap
   hs-source-dirs:
       src
   build-depends:
