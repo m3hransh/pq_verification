@@ -9,15 +9,13 @@ import Prelude hiding (min)
 
 {-@ type Nat = {v : Int | v >= 0} @-}
 
-{-@ type HeapUpper a X = Heap {v : a | X <= v} @-}
-
 data Heap a = Empty | Node {value :: a, left :: (Heap a), right :: (Heap a), rank :: Int}
   deriving (Show)
 
 {-@ data Heap [size] a = Empty
             | Node { value :: a
-                    ,left  :: {h : Heap a | isLowerBound value h}
-                    ,right :: {v : Heap a  | isLowerBound value v && rrank v <= rrank left }
+                    , left  :: {h : Heap a | isLowerBound value h}
+                    , right :: {v : Heap a  | isLowerBound value v && rrank v <= rrank left }
                     , rank :: {r : Nat | r == 1 + rrank right}
                   }
  @-}
