@@ -40,3 +40,39 @@ instance BinaryDigit Int where
   carry x y = x + y `div` 2
   zero = 0
   one = 1
+
+data MinView q a = Min a (q a) | EmptyView
+  deriving (Show)
+
+class PriorityQueue q where
+  empty :: q a
+  singleton :: (Ord a) => a -> q a
+  isEmpty :: q a -> Bool
+  merge :: (Ord a) => q a -> q a -> q a
+  splitMin :: (Ord a) => q a -> MinView q a
+  insert :: (Ord a) => a -> q a -> q a
+  insert x q = merge (singleton x) q
+
+data BinTree a = Empty | Node {value :: a, left :: BinTree a, right :: BinTree a}
+  deriving (Show)
+
+newtype ToppedTree a = ToppedTree (MinView BinTree a)
+  deriving (Show)
+
+instance PriorityQueue ToppedTree where
+  empty = ToppedTree EmptyView
+  singleton x = ToppedTree (Min x Empty)
+  isEmpty (ToppedTree EmptyView) = True
+  isEmpty _ = False
+  merge (ToppedTree EmptyView) (ToppedTree EmptyView) = ToppedTree EmptyView
+  merge (ToppedTree EmptyView) (ToppedTree (Min x2 t2)) = ToppedTree (Min x2 t2)
+  merge (ToppedTree (Min x1 t1)) (ToppedTree EmptyView) = ToppedTree (Min x1 t1)
+  merge (ToppedTree (Min x1 t1)) (ToppedTree (Min x2 t2))
+    | x1 <= x2 = ToppedTree (Min x1 (Node x2 t2 t1))
+    | otherwise = ToppedTree (Min x2 (Node x1 t1 t2))
+
+  splitMin (ToppedTree EmptyView) = EmptyView
+  splitMin (ToppedTree (Min x bt)) = Min x (secondMin bt)
+   where
+    secondMin Empty = ToppedTree EmptyView
+    secondMin (Node y l r) = merge (ToppedTree (Min y l)) (secondMin r)
