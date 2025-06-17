@@ -1,8 +1,19 @@
 \chapter { Priority Queue Implementations }
 \section { Specification of Priority Queue Properties }
-Formal requirements: ordering, insert, deleteMin, etc.
 
-\section { Simple List-Based Implementation }
+Priority queues or heaps are data structures that provide efficient access to the high priority element (often minimum element).
+that support the following operations:
+
+\begin{itemize}
+	\item \textbf{Insert}: Add an element with a given priority.
+	\item \textbf{Find-Min}: Retrieve the element with the highest priority (lowest value).
+	\item \textbf{Delete-Min}: Remove the element with the highest priority.
+	\item \textbf{Merge}: Combine two priority queues into one.
+\end{itemize}
+
+For the sake of simplicity, we will focus on the \textbf{min-heap} variant, where the element with the lowest value has the highest priority.
+
+\section { Leftist Heap Implementation }
 Haskell code, explanation, and verification.
 
 \section { Binary Heap Implementation }
