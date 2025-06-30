@@ -9,14 +9,14 @@ extra-deps:
   - store-0.7.19
   - store-core-0.4.4.6
   - git: https://github.com/ucsd-progsys/liquidhaskell
-    commit: dd998ace0b7784da669f377c6087c87f35ff0210 
+    commit: 6baa675f6bb000d016f0c859d7f865263679dc43 
     subdirs:
       - .
       - liquid-prelude
       - liquid-vector
       - liquidhaskell-boot
   - git: https://github.com/ucsd-progsys/liquid-fixpoint
-    commit: fa855d1c77a2fbf18aa53b56d02f9807a5d01a3b
+    commit: 031df812a6df0c05b675ac1db9a9076f38b1c6e8 
 
 allow-newer: true
 nix:
