@@ -13,11 +13,12 @@ data Heap a = Empty | Node {value :: a, left :: (Heap a), right :: (Heap a), ran
   deriving (Show)
 
 {-@ data Heap a = Empty
-            | Node { value :: a
-                    , left  :: {h : Heap a | isLowerBound value h}
-                    , right :: {v : Heap a  | isLowerBound value v && rrank v <= rrank left }
-                    , rank :: {r : Nat | r == 1 + rrank right}
-                  }
+      | Node { value :: a
+         , left  :: {h : Heap a | isLowerBound value h}
+         , right :: {v : Heap a  | isLowerBound value v
+                    && rrank v <= rrank left }
+         , rank :: {r : Nat | r == 1 + rrank right}
+        }
  @-}
 
 {-@ measure size @-}

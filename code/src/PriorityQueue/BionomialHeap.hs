@@ -1,78 +1,85 @@
 module PriorityQueue.BionomialHeap where
 
+import Language.Haskell.Liquid.ProofCombinators
+import Language.Haskell.Liquid.ProofCombinators (Proof, withProof)
+import PriorityQueue.LeftistHeap (lemma_merge_case1)
 import Prelude hiding (sum)
 
-class (Eq a, Show a) => BinaryDigit a where
-  sum :: a -> a -> a
-  carry :: a -> a -> a
-  zero :: a
-  one :: a
+{-@ LIQUID "--reflection" @-}
+{-@ LIQUID "--ple" @-}
 
-halfAdder :: (BinaryDigit a) => a -> a -> (a, a)
-halfAdder x y = (sum x y, carry x y)
+-- Binary tree with heap property
+{-@ reflect isLowerBound @-}
+{-@ isLowerBound :: Ord a => v:a -> t:BinTree a -> Bool @-}
+isLowerBound :: (Ord a) => a -> BinTree a -> Bool
+isLowerBound _ Empty = True
+isLowerBound v (Bin x l r) = v <= x && isLowerBound v l && isLowerBound v r
 
-fullAdder :: (BinaryDigit a) => a -> a -> a -> (a, a)
-fullAdder x y c =
-  let (s1, c1) = halfAdder x y
-      (s2, c2) = halfAdder s1 c
-   in (s2, sum c1 c2)
+{-@ data BinTree a = Empty
+      | Bin { value :: a
+           , left  :: {t : BinTree a | isLowerBound value t}
+           , right :: BinTree a
+           }
+  @-}
+data BinTree a = Empty | Bin {value :: a, left :: BinTree a, right :: BinTree a}
+  deriving (Show)
 
-add :: (BinaryDigit a, Show a) => [a] -> [a] -> [a]
-add x y = addWithCarry x y zero
+-- Priority queue data structure
+{-@ data ToppedTree a = EmptyTree
+                      | WinnerTree { min :: a
+                           , rest :: {rst : BinTree a | isLowerBound min rst}
+                           }
+  @-}
+data ToppedTree a
+  = EmptyTree
+  | WinnerTree {min :: a, rest :: (BinTree a)}
+  deriving (Show)
 
-addWithCarry :: (BinaryDigit a) => [a] -> [a] -> a -> [a]
-addWithCarry [] [] c = if c == zero then [] else [c]
-addWithCarry xs [] c = addDigit xs c
-addWithCarry [] ys c = addDigit ys c
-addWithCarry (x : xs) (y : ys) c =
-  let (s, c') = fullAdder x y c
-   in s : addWithCarry xs ys c'
+data MinView a = EmptyView | Min a (ToppedTree a)
+  deriving (Show)
 
-addDigit :: (BinaryDigit a) => [a] -> a -> [a]
-addDigit [] c | c == zero = []
-addDigit [] c = [c]
-addDigit (x : xs) c = s : addDigit xs c'
+-- Priority queue operations (without typeclass)
+{-@ empty :: ToppedTree a @-}
+empty :: ToppedTree a
+empty = EmptyTree
+
+{-@ singleton :: Ord a => a -> ToppedTree a @-}
+singleton :: (Ord a) => a -> ToppedTree a
+singleton x = WinnerTree x Empty
+
+{-@ isEmpty :: ToppedTree a -> Bool @-}
+isEmpty :: ToppedTree a -> Bool
+isEmpty EmptyTree = True
+isEmpty _ = False
+
+{-@ merge :: Ord a => ToppedTree a -> ToppedTree a -> ToppedTree a @-}
+merge :: (Ord a) => ToppedTree a -> ToppedTree a -> ToppedTree a
+merge EmptyTree EmptyTree = EmptyTree
+merge EmptyTree (WinnerTree x2 t2) = WinnerTree x2 t2
+merge (WinnerTree x1 t1) EmptyTree = WinnerTree x1 t1
+merge (WinnerTree x1 t1) (WinnerTree x2 t2)
+  | x1 <= x2 = WinnerTree x1 (Bin x2 t2 t1 `withProof` (isLowerBound x2 t2))
+  | otherwise = WinnerTree x2 (Bin x1 t1 t2)
+
+{-@ lemma_merge_case1::  a -> a -> BinTree a -> BinTree a -> {True}@-}
+lemma_merge_case1 :: (Ord a) => a -> a -> BinTree a -> BinTree a -> Proof
+lemma_merge_case1 x1 x2 t1 t2 = ()
+
+{-@ splitMin :: Ord a => ToppedTree a -> MinView a @-}
+splitMin :: (Ord a) => ToppedTree a -> MinView a
+splitMin EmptyTree = EmptyView
+splitMin (WinnerTree x bt) = Min x (secondMin bt)
  where
-  (s, c') = halfAdder x c
+  {-@ secondMin :: Ord a => BinTree a -> ToppedTree a @-}
+  secondMin :: (Ord a) => BinTree a -> ToppedTree a
+  secondMin Empty = EmptyTree
+  secondMin (Bin y l r) = merge (WinnerTree y l) (secondMin r)
 
-instance BinaryDigit Int where
-  sum x y = (x + y) `mod` 2
-  carry x y = x + y `div` 2
-  zero = 0
-  one = 1
+{-@ insert :: Ord a => a -> ToppedTree a -> ToppedTree a @-}
+insert :: (Ord a) => a -> ToppedTree a -> ToppedTree a
+insert x pq = merge (singleton x) pq
 
-data MinView q a = Min a (q a) | EmptyView
-  deriving (Show)
-
-class PriorityQueue q where
-  empty :: q a
-  singleton :: (Ord a) => a -> q a
-  isEmpty :: q a -> Bool
-  merge :: (Ord a) => q a -> q a -> q a
-  splitMin :: (Ord a) => q a -> MinView q a
-  insert :: (Ord a) => a -> q a -> q a
-  insert x q = merge (singleton x) q
-
-data BinTree a = Empty | Node {value :: a, left :: BinTree a, right :: BinTree a}
-  deriving (Show)
-
-newtype ToppedTree a = ToppedTree (MinView BinTree a)
-  deriving (Show)
-
-instance PriorityQueue ToppedTree where
-  empty = ToppedTree EmptyView
-  singleton x = ToppedTree (Min x Empty)
-  isEmpty (ToppedTree EmptyView) = True
-  isEmpty _ = False
-  merge (ToppedTree EmptyView) (ToppedTree EmptyView) = ToppedTree EmptyView
-  merge (ToppedTree EmptyView) (ToppedTree (Min x2 t2)) = ToppedTree (Min x2 t2)
-  merge (ToppedTree (Min x1 t1)) (ToppedTree EmptyView) = ToppedTree (Min x1 t1)
-  merge (ToppedTree (Min x1 t1)) (ToppedTree (Min x2 t2))
-    | x1 <= x2 = ToppedTree (Min x1 (Node x2 t2 t1))
-    | otherwise = ToppedTree (Min x2 (Node x1 t1 t2))
-
-  splitMin (ToppedTree EmptyView) = EmptyView
-  splitMin (ToppedTree (Min x bt)) = Min x (secondMin bt)
-   where
-    secondMin Empty = ToppedTree EmptyView
-    secondMin (Node y l r) = merge (ToppedTree (Min y l)) (secondMin r)
+-- Helper function for creating singleton trees
+{-@ singletonTree :: Ord a => x:a -> ToppedTree a @-}
+singletonTree :: (Ord a) => a -> ToppedTree a
+singletonTree x = (WinnerTree x (Empty `withProof` (isLowerBound x Empty)))
