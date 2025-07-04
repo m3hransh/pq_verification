@@ -38,11 +38,6 @@ data ToppedTree a
 data MinView a = EmptyView | Min a (ToppedTree a)
   deriving (Show)
 
--- Priority queue operations (without typeclass)
-{-@ empty :: ToppedTree a @-}
-empty :: ToppedTree a
-empty = EmptyTree
-
 {-@ singleton :: Ord a => a -> ToppedTree a @-}
 singleton :: (Ord a) => a -> ToppedTree a
 singleton x = WinnerTree x Empty
@@ -58,12 +53,13 @@ merge EmptyTree EmptyTree = EmptyTree
 merge EmptyTree (WinnerTree x2 t2) = WinnerTree x2 t2
 merge (WinnerTree x1 t1) EmptyTree = WinnerTree x1 t1
 merge (WinnerTree x1 t1) (WinnerTree x2 t2)
-  | x1 <= x2 = WinnerTree x1 (Bin x2 t2 t1 `withProof` (isLowerBound x2 t2))
-  | otherwise = WinnerTree x2 (Bin x1 t1 t2)
+  | x1 <= x2 = WinnerTree x1 ((Bin x2 t2 t1) `withProof` lemma_isLowerBound_transitive x1 x2 t2)
+  | otherwise = WinnerTree x2 ((Bin x1 t1 t2) `withProof` lemma_isLowerBound_transitive x2 x1 t1)
 
-{-@ lemma_merge_case1::  a -> a -> BinTree a -> BinTree a -> {True}@-}
-lemma_merge_case1 :: (Ord a) => a -> a -> BinTree a -> BinTree a -> Proof
-lemma_merge_case1 x1 x2 t1 t2 = ()
+{-@ lemma_isLowerBound_transitive :: x1 : a -> x2 : {v : a | x1 <= v} ->  t : {v : BinTree a | isLowerBound x2 t } -> {isLowerBound x1 t} @-}
+lemma_isLowerBound_transitive :: a -> a -> BinTree a -> Proof
+lemma_isLowerBound_transitive x1 x2 Empty = ()
+lemma_isLowerBound_transitive x1 x2 (Bin x t1 t2) = lemma_isLowerBound_transitive x1 x2 t1 &&& lemma_isLowerBound_transitive x1 x2 t2 *** QED
 
 {-@ splitMin :: Ord a => ToppedTree a -> MinView a @-}
 splitMin :: (Ord a) => ToppedTree a -> MinView a

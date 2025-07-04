@@ -7,8 +7,6 @@ import Prelude hiding (min)
 {-@ LIQUID "--reflection" @-}
 {-@ LIQUID "--ple" @-}
 
-{-@ type Nat = {v : Int | v >= 0} @-}
-
 data Heap a = Empty | Node {value :: a, left :: (Heap a), right :: (Heap a), rank :: Int}
   deriving (Show)
 
@@ -54,7 +52,7 @@ isEmpty Empty = True
 isEmpty _ = False
 
 {-@ measure findMin @-}
-{-@ findMin :: h : { h : Heap a | not isEmpty h} -> {v : a | isLowerBound v h} @-}
+{-@ findMin :: h : { h : Heap a | not isEmpty h } -> {v : a | isLowerBound v h} @-}
 findMin :: (Ord a) => Heap a -> a
 findMin (Node x l r rank) = x
 
