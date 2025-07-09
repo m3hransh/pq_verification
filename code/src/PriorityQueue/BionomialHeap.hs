@@ -13,17 +13,25 @@ import Prelude hiding (sum)
 {-@ isLowerBound :: Ord a => v:a -> t:BinTree a -> Bool @-}
 isLowerBound :: (Ord a) => a -> BinTree a -> Bool
 isLowerBound _ Empty = True
-isLowerBound v (Bin x l r) = v <= x && isLowerBound v l && isLowerBound v r
+isLowerBound v (Bin x l r _) = v <= x && isLowerBound v l && isLowerBound v r
+
+data BinTree a = Empty | Bin {value :: a, left :: BinTree a, right :: BinTree a, height :: Int}
+  deriving (Show)
+
+{-@ measure bheight @-}
+{-@ bheight :: BinTree a -> Nat @-}
+bheight :: BinTree a -> Int
+bheight Empty = 0
+bheight (Bin _ _ _ h) = h
 
 {-@ data BinTree a = Empty
       | Bin { value :: a
            , left  :: {t : BinTree a | isLowerBound value t}
-           , right :: BinTree a
+          , right :: {t : BinTree a | bheight t == bheight left}
+          , height :: {h : Nat | bheight left + 1 == h && bheight right + 1 == h}
+
            }
   @-}
-data BinTree a = Empty | Bin {value :: a, left :: BinTree a, right :: BinTree a}
-  deriving (Show)
-
 -- Priority queue data structure
 {-@ data ToppedTree a = EmptyTree
                       | WinnerTree { min :: a
@@ -38,17 +46,11 @@ data ToppedTree a
 data MinView a = EmptyView | Min a (ToppedTree a)
   deriving (Show)
 
-{-@ measure bsize @-}
-{-@ bsize :: BinTree a -> Nat @-}
-bsize :: BinTree a -> Int
-bsize Empty = 0
-bsize (Bin _ l r) = 1 + bsize l + bsize r
-
 {-@ measure tsize @-}
 {-@ tsize :: ToppedTree a -> Nat @-}
 tsize :: ToppedTree a -> Int
 tsize EmptyTree = 0
-tsize (WinnerTree _ t) = 1 + bsize t
+tsize (WinnerTree _ t) = 1 + bheight t
 
 {-@ singleton :: Ord a => a -> ToppedTree a @-}
 singleton :: (Ord a) => a -> ToppedTree a
@@ -59,33 +61,33 @@ isEmpty :: ToppedTree a -> Bool
 isEmpty EmptyTree = True
 isEmpty _ = False
 
-{-@ merge :: Ord a => ToppedTree a -> ToppedTree a -> ToppedTree a @-}
+{-@ merge :: Ord a => t1: ToppedTree a -> t2: {t : ToppedTree a | tsize t == tsize t1} -> ToppedTree a @-}
 merge :: (Ord a) => ToppedTree a -> ToppedTree a -> ToppedTree a
 merge EmptyTree EmptyTree = EmptyTree
 merge EmptyTree (WinnerTree x2 t2) = WinnerTree x2 t2
 merge (WinnerTree x1 t1) EmptyTree = WinnerTree x1 t1
 merge (WinnerTree x1 t1) (WinnerTree x2 t2)
-  | x1 <= x2 = WinnerTree x1 ((Bin x2 t2 t1) `withProof` lemma_isLowerBound_transitive x1 x2 t2)
-  | otherwise = WinnerTree x2 ((Bin x1 t1 t2) `withProof` lemma_isLowerBound_transitive x2 x1 t1)
+  | x1 <= x2 = WinnerTree x1 ((Bin x2 t2 t1 (bheight t1 + 1)) `withProof` lemma_isLowerBound_transitive x1 x2 t2)
+  | otherwise = WinnerTree x2 ((Bin x1 t1 t2 (bheight t2 + 1)) `withProof` lemma_isLowerBound_transitive x2 x1 t1)
 
 {-@ lemma_isLowerBound_transitive :: x1 : a -> x2 : {v : a | x1 <= v} ->  t : {v : BinTree a | isLowerBound x2 t } -> {isLowerBound x1 t} @-}
 lemma_isLowerBound_transitive :: a -> a -> BinTree a -> Proof
 lemma_isLowerBound_transitive x1 x2 Empty = ()
-lemma_isLowerBound_transitive x1 x2 (Bin x t1 t2) = lemma_isLowerBound_transitive x1 x2 t1 &&& lemma_isLowerBound_transitive x1 x2 t2 *** QED
+lemma_isLowerBound_transitive x1 x2 (Bin x t1 t2 _) = lemma_isLowerBound_transitive x1 x2 t1 &&& lemma_isLowerBound_transitive x1 x2 t2 *** QED
 
-{-@ splitMin :: Ord a => ToppedTree a -> MinView a @-}
-splitMin :: (Ord a) => ToppedTree a -> MinView a
-splitMin EmptyTree = EmptyView
-splitMin (WinnerTree x bt) = Min x (secondMin bt)
- where
-  {-@ secondMin :: Ord a => BinTree a -> ToppedTree a @-}
-  secondMin :: (Ord a) => BinTree a -> ToppedTree a
-  secondMin Empty = EmptyTree
-  secondMin (Bin y l r) = merge (WinnerTree y l) (secondMin r)
-
-{-@ insert :: Ord a => a -> ToppedTree a -> ToppedTree a @-}
-insert :: (Ord a) => a -> ToppedTree a -> ToppedTree a
-insert x pq = merge (singleton x) pq
+-- {-@ splitMin :: Ord a => ToppedTree a -> MinView a @-}
+-- splitMin :: (Ord a) => ToppedTree a -> MinView a
+-- splitMin EmptyTree = EmptyView
+-- splitMin (WinnerTree x bt) = Min x (secondMin bt)
+--  where
+--   {-@ secondMin :: Ord a => BinTree a -> ToppedTree a @-}
+--   secondMin :: (Ord a) => BinTree a -> ToppedTree a
+--   secondMin Empty = EmptyTree
+--   secondMin (Bin y l r _) = merge (WinnerTree y l) (secondMin r)
+--
+-- {-@ insert :: Ord a => a -> ToppedTree a -> ToppedTree a @-}
+-- insert :: (Ord a) => a -> ToppedTree a -> ToppedTree a
+-- insert x pq = merge (singleton x) pq
 
 -- Helper function for creating singleton trees
 {-@ singletonTree :: Ord a => x:a -> ToppedTree a @-}
