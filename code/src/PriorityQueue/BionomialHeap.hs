@@ -38,6 +38,18 @@ data ToppedTree a
 data MinView a = EmptyView | Min a (ToppedTree a)
   deriving (Show)
 
+{-@ measure bsize @-}
+{-@ bsize :: BinTree a -> Nat @-}
+bsize :: BinTree a -> Int
+bsize Empty = 0
+bsize (Bin _ l r) = 1 + bsize l + bsize r
+
+{-@ measure tsize @-}
+{-@ tsize :: ToppedTree a -> Nat @-}
+tsize :: ToppedTree a -> Int
+tsize EmptyTree = 0
+tsize (WinnerTree _ t) = 1 + bsize t
+
 {-@ singleton :: Ord a => a -> ToppedTree a @-}
 singleton :: (Ord a) => a -> ToppedTree a
 singleton x = WinnerTree x Empty
@@ -79,3 +91,20 @@ insert x pq = merge (singleton x) pq
 {-@ singletonTree :: Ord a => x:a -> ToppedTree a @-}
 singletonTree :: (Ord a) => a -> ToppedTree a
 singletonTree x = (WinnerTree x (Empty `withProof` (isLowerBound x Empty)))
+
+-- {-@ type BinBinomialHeap a = [ToppedTree a] <{\hd v -> (tsize hd) < (tsize v) }> @-}
+-- type BinBinomialHeap a = [ToppedTree a]
+--
+-- This is errornous because it does not satisfy the invariant that the size of the first tree is less than the second.
+-- I think this is error in Liquid Haskell.
+-- btree :: BinBinomialHeap Int
+-- btree = [WinnerTree 1 (Bin 3 Empty Empty), EmptyTree]
+
+data PList a = Nil | Cons a (PList a)
+
+{-@ data PList a < p :: a -> a -> Bool> =
+        Nil
+      | Cons { phd :: a, ptl :: PList < p >  a < p phd > }  @-}
+
+{-@ type BionomialHeap a = PList <{\hd v -> (tsize hd) <= (tsize v) }> (ToppedTree a) @-}
+type BionomialHeap a = PList (ToppedTree a)
