@@ -15,11 +15,15 @@
         buildInputs = with pkgs; [
           z3
           stack
-          haskell.packages."${"ghc948"}".ghcid
+          haskell.packages."${compilerVersion}".ghcid
           haskell.packages."${compilerVersion}".haskell-language-server
           cabal-install
           haskell.packages.${compilerVersion}.ghc
         ];
+        shellHook=''
+        export NIX_PATH="nixpkgs=${toString nixpkgs}"
+        echo "NIX_PATH set to: $NIX_PATH"
+        '';
       };
     };
 }
