@@ -2,6 +2,7 @@ module PriorityQueue.LeftistHeap where
 
 import Language.Haskell.Liquid.ProofCombinators
 
+import PriorityQueue.Base
 import Prelude hiding (min)
 
 {-@ LIQUID "--reflection" @-}
@@ -18,12 +19,6 @@ data Heap a = Empty | Node {value :: a, left :: (Heap a), right :: (Heap a), ran
          , rank :: {r : Nat | r == 1 + rrank right}
         }
  @-}
-
-{-@ data MinView q a =
-        EmptyView
-      | Min { minValue :: a, restHeap :: q a }
-  @-}
-data MinView q a = EmptyView | Min {minValue :: a, restHeap :: q a}
 
 {-@ measure size @-}
 {-@ size :: Heap a -> Nat @-}
@@ -123,12 +118,6 @@ heapDeleteMin h@(Node _ l r _) = heapMerge l r
 heapSplit :: (Ord a) => Heap a -> MinView Heap a
 heapSplit Empty = EmptyView
 heapSplit (Node x l r _) = Min x (heapMerge l r)
-
-class PriorityQueue pq where
-  empty :: (Ord a) => pq a
-  isEmpty :: (Ord a) => pq a -> Bool
-  insert :: (Ord a) => a -> pq a -> pq a
-  splitMin :: (Ord a) => pq a -> MinView pq a
 
 instance PriorityQueue Heap where
   empty = Empty

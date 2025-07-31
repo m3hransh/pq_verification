@@ -43,9 +43,6 @@ data ToppedTree a
   | WinnerTree {min :: a, rest :: (BinTree a)}
   deriving (Show)
 
-data MinView a = EmptyView | Min a (ToppedTree a)
-  deriving (Show)
-
 {-@ measure tsize @-}
 {-@ tsize :: ToppedTree a -> Nat @-}
 tsize :: ToppedTree a -> Int
@@ -56,16 +53,15 @@ tsize (WinnerTree _ t) = 1 + bheight t
 singleton :: (Ord a) => a -> ToppedTree a
 singleton x = WinnerTree x Empty
 
+{-@ measure isEmpty @-}
 {-@ isEmpty :: ToppedTree a -> Bool @-}
 isEmpty :: ToppedTree a -> Bool
 isEmpty EmptyTree = True
 isEmpty _ = False
 
-{-@ merge :: Ord a => t1: ToppedTree a -> t2: {t : ToppedTree a | tsize t == tsize t1} -> ToppedTree a @-}
+{-@reflect merge @-}
+{-@ merge :: Ord a => t1: {t: ToppedTree a | tsize t> 0} -> t2: {t : ToppedTree a | tsize t == tsize t1} -> {v: ToppedTree a | tsize v == tsize t1 + 1} @-}
 merge :: (Ord a) => ToppedTree a -> ToppedTree a -> ToppedTree a
-merge EmptyTree EmptyTree = EmptyTree
-merge EmptyTree (WinnerTree x2 t2) = WinnerTree x2 t2
-merge (WinnerTree x1 t1) EmptyTree = WinnerTree x1 t1
 merge (WinnerTree x1 t1) (WinnerTree x2 t2)
   | x1 <= x2 = WinnerTree x1 ((Bin x2 t2 t1 (bheight t1 + 1)) `withProof` lemma_isLowerBound_transitive x1 x2 t2)
   | otherwise = WinnerTree x2 ((Bin x1 t1 t2 (bheight t2 + 1)) `withProof` lemma_isLowerBound_transitive x2 x1 t1)
@@ -102,11 +98,60 @@ singletonTree x = (WinnerTree x (Empty `withProof` (isLowerBound x Empty)))
 -- btree :: BinBinomialHeap Int
 -- btree = [WinnerTree 1 (Bin 3 Empty Empty), EmptyTree]
 
-data PList a = Nil | Cons a (PList a)
-
 {-@ data PList a < p :: a -> a -> Bool> =
         Nil
       | Cons { phd :: a, ptl :: PList < p >  a < p phd > }  @-}
+data PList a = Nil | Cons a (PList a)
+
+{-@ measure bhsize @-}
+{-@ bhsize :: PList a -> Nat @-}
+bhsize :: PList a -> Int
+bhsize Nil = 0
+bhsize (Cons h t) = 1 + bhsize t
 
 {-@ type BionomialHeap a = PList <{\hd v -> (tsize hd) <= (tsize v) }> (ToppedTree a) @-}
 type BionomialHeap a = PList (ToppedTree a)
+
+-- Helper functions for BionomialHeap operations
+
+{-@ emptyHeap :: BionomialHeap a @-}
+emptyHeap :: BionomialHeap a
+emptyHeap = Nil
+
+{-@ isEmptyHeap :: BionomialHeap a -> Bool @-}
+isEmptyHeap :: BionomialHeap a -> Bool
+isEmptyHeap Nil = True
+isEmptyHeap _ = False
+
+-- Insert a tree into a heap, maintaining size ordering
+{-@ reflect insertTree @-}
+{-@ insertTree :: Ord a => {t : ToppedTree a | tsize t > 0}  -> h : BionomialHeap a -> BionomialHeap a  / [bhsize h] @-}
+insertTree :: (Ord a) => ToppedTree a -> BionomialHeap a -> BionomialHeap a
+insertTree t Nil = Cons t Nil
+insertTree t (Cons h hs)
+  | tsize t < tsize h = Cons t (Cons h hs)
+  | tsize t == tsize h = insertTree (merge t h) hs
+  | otherwise = Cons h (insertTree t hs)
+
+--
+-- -- Merge two binomial heaps with termination measure
+-- {-@ mergeHeaps :: Ord a => h1:BionomialHeap a -> h2:BionomialHeap a -> BionomialHeap a / [len h1 + len h2] @-}
+-- mergeHeaps :: (Ord a) => BionomialHeap a -> BionomialHeap a -> BionomialHeap a
+-- mergeHeaps Nil h2 = h2
+-- mergeHeaps h1 Nil = h1
+-- mergeHeaps (Cons t1 h1) (Cons t2 h2)
+--   | tsize t1 < tsize t2 = Cons t1 (mergeHeaps h1 (Cons t2 h2))
+--   | tsize t1 > tsize t2 = Cons t2 (mergeHeaps (Cons t1 h1) h2)
+--   | otherwise = insertTree (merge t1 t2) (mergeHeaps h1 h2)
+--
+-- -- Insert a single element into a binomial heap
+-- {-@ insertHeap :: Ord a => a -> BionomialHeap a -> BionomialHeap a @-}
+-- insertHeap :: (Ord a) => a -> BionomialHeap a -> BionomialHeap a
+-- insertHeap x h = insertTree (singleton x) h
+
+-- Helper function to calculate length of PList
+{-@ measure len @-}
+{-@ len :: PList a -> Nat @-}
+len :: PList a -> Int
+len Nil = 0
+len (Cons _ xs) = 1 + len xs

@@ -17,6 +17,8 @@ library
       PriorityQueue.LeftistHeap
       PriorityQueue.Example
       PriorityQueue.BionomialHeap
+      PriorityQueue.Base
+      
   hs-source-dirs:
       src
   build-depends:
