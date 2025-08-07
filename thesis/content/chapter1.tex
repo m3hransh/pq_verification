@@ -1,13 +1,46 @@
 \chapter{Introduction} %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{ Motivation }
-Why verifying data structures matters; common bugs; importance in safety-critical systems.
+Data structures are fundamental in computer science, providing efficient ways to organize, store, and manipulate data.
+However, correctness of these structures is vital, especially in safety-critical systems such as aviation, finance, or healthcare, where software bugs can lead to catastrophic consequences.
+Traditional testing techniques are often insufficient to cover all execution paths or edge cases, particularly for complex data invariants.
+
+Priority queues are one such data structure used widely in scheduling, pathfinding algorithms (e.g., Dijkstra’s), and operating systems.
+Their correctness is essential to ensure minimal elements are accessed as expected, and operations like insertion, deletion, and merging preserve the heap property \cite{okasaki}.
+
+Formal verification provides a promising avenue for ensuring correctness, but mainstream adoption is hindered by the complexity of existing tools.
+This thesis explores an approach that brings verification closer to the developer:
+integrating verification directly into the Haskell programming language via \texttt{LiquidHaskell}.
+By embedding logical specifications into types, developers can catch invariant violations at compile time—without leaving their programming environment \cite{rondonLiquidTypes2008}.
 
 \section{ Problem Statement }
-Challenges in verification; issues with manual proofs or theorem provers.
+Program verification is the process of proving that a program adheres to its intended specifications. 
+For example, verifying that the result of a \texttt{splitMin} operation on a priority queue indeed removes the minimum element and preserves the heap invariant.
 
+While powerful tools like Coq, Agda, and Dafny enable formal proofs,
+they often require switching to a new language or proof assistant environment,
+a deep understanding of dependent types or interactive theorem proving, and significant annotation and proof overhead.
+These barriers limit adoption in day-to-day software development.
+
+\texttt{LiquidHaskell} offers an alternative: a lightweight refinement type system that integrates seamlessly into Haskell \cite{vazou2018}.
+It leverages SMT solvers to check properties like invariants, preconditions, and postconditions automatically, thus reducing manual proof effort.
 \section{ Goals and Contributions }
-What this thesis aims to achieve—verified priority queues, use of Liquid Haskell, etc.
+This thesis aims to bridge the gap between practical programming and formal verification by demonstrating how Liquid Haskell can be used to verify the correctness of priority queue implementations.
 
+The key contributions are as follows.
+First, we implement multiple functional priority queue variants (e.g., Leftist Heap, Binary Heap) in Haskell.
+Second, we encode structural and behavioral invariants using refinement types in Liquid Haskell.
+Third, we demonstrate verification of correctness properties directly in Haskell with minimal annotation.
+Finally, we evaluate the ease, limitations, and effort required in this approach compared to traditional theorem provers.
+
+This integrated approach allows both implementation and verification to happen in the same language and tooling ecosystem, making verified software development more accessible.
 \section{ Structure of the Thesis }
-Brief summary of the chapters.
+The rest of this thesis is structured as follows:
+
+\begin{itemize}
+  \item \textbf{Chapter 2} provides background on functional data structures, priority queues, and program verification techniques, along with related work.
+  \item \textbf{Chapter 3} describes the design and implementation of different priority queue variants in Haskell.
+  \item \textbf{Chapter 4} introduces Liquid Haskell, its syntax, verification pipeline, and its strengths and limitations.
+  \item \textbf{Chapter 5} demonstrates the verification of priority queue operations using Liquid Haskell, including encoding invariants, use of refinement types, and example proofs.
+  \item \textbf{Appendices} contain the complete verified code and additional implementation insights.
+\end{itemize}

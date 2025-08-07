@@ -1,26 +1,14 @@
-\chapter { Priority Queue Implementations }
-\section { Specification of Priority Queue Properties }
+\chapter { Liquid Haskell }
+\section { Overview of Liquid Haskell }
+Setup, syntax, and capabilities.
 
-Priority queues or heaps are data structures that provide efficient access to the high priority element (often minimum element).
-that support the following operations:
+\section { Specification Language }
+How to write and interpret refinement types.
 
-\begin{itemize}
-	\item \textbf{Insert}: Add an element with a given priority.
-	\item \textbf{Find-Min}: Retrieve the element with the highest priority (lowest value).
-	\item \textbf{Delete-Min}: Remove the element with the highest priority.
-	\item \textbf{Merge}: Combine two priority queues into one.
-\end{itemize}
+\section { Verification Workflow }
+From writing Haskell code to getting verified guarantees via Liquid Haskell.
 
-For the sake of simplicity, we will focus on the \textbf{min-heap} variant, where the element with the lowest value has the highest priority.
-
-\section { Leftist Heap Implementation }
-Haskell code, explanation, and verification.
-
-\section { Binary Heap Implementation }
-Code structure, key invariants, and proof techniques.
-
-\section { Skew/Binomial/Pairing Heap (optional) }
-More advanced structure and proof techniques (if time allows).
-
-\section { Comparison of Implementations }
-Performance, expressiveness, and verification effort.
+\section { Strengths and Limitations }
+Where it excels and where it struggles (e.g., termination proofs, higher-order functions).
+\section { Related Work }
+Comparison with Coq, Agda, Dafny, or other tools verifying similar structures.
