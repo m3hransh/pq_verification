@@ -12,6 +12,8 @@
 \usepackage[T1]{fontenc}
 \usepackage{csquotes}
 \usepackage{titling}
+\usepackage{listings}
+\usepackage{xcolor}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -21,6 +23,64 @@
 \usepackage{tikz}
     \usetikzlibrary{external} % Externalizes Tikz graphics - speeds up compilation if unchanged.
 
+% --- Minimal modern palette ---
+\definecolor{CodeBg}{HTML}{FAFAFA}   % off-white
+\definecolor{CodeNum}{HTML}{9AA0A6}  % soft gray (line numbers)
+\definecolor{CodeKw}{HTML}{1A4D8F}   % deep muted blue (Haskell keywords)
+\definecolor{CodeCm}{HTML}{6A737D}   % neutral gray (comments)
+\definecolor{CodeStr}{HTML}{B20059}  % muted magenta (strings)
+\definecolor{LHAnnot}{HTML}{9B6B00}  % warm amber (Liquid Haskell blocks)
+\definecolor{LHKey}{HTML}{0B806A}    % teal (LH keywords inside {-@ @-})
+\definecolor{FuncName}{HTML}{005F5F}   % teal for functions
+\definecolor{TypeClass}{HTML}{7A1E72}  % purple for typeclasses
+
+% --- Haskell + Liquid Haskell language definition ---
+\lstdefinelanguage{Haskell}{
+  morekeywords={
+    data, type, where, let, in, if, then, else, case, of,
+    class, instance, deriving, do, module, import, hiding,
+    qualified, as, newtype
+  },
+  sensitive=true,
+  morecomment=[l]--,
+  morecomment=[s]{\{-}{-\}},
+  morestring=[b]",
+  % Liquid Haskell annotation blocks:
+  morecomment=[s][\color{LHAnnot}\itshape]{\{-@}{@-\}},
+  % Optional: emphasize common LH "keywords" (only visible when not inside {-@ @-},
+  % but nice to keep consistent color if they appear in code comments, etc.)
+  morekeywords=[2]{measure,invariant,reflect,assume,assert,termination,ple,qualif,axiomatize},
+% Function names you want emphasized:
+  morekeywords=[3]{insert,deleteMin,merge,findMin,rank, empty, isEmpty, splitMin},
+  % Typeclasses or types you want emphasized:
+  morekeywords=[4]{Ord,Eq,Show,Functor,Monad,PriorityQueue},
+  keywordstyle=\color{CodeKw}\bfseries,
+  keywordstyle=[2]\color{LHKey}\bfseries,
+  keywordstyle=[3]\color{FuncName}\bfseries,
+  keywordstyle=[4]\color{TypeClass}\bfseries,
+}
+
+% --- Global code style ---
+\lstdefinestyle{codeModern}{
+  language=Haskell,
+  backgroundcolor=\color{CodeBg},
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{CodeKw}\bfseries,
+  commentstyle=\color{CodeCm}\itshape,
+  stringstyle=\color{CodeStr},
+  numbers=left,
+  numberstyle=\tiny\color{CodeNum},
+  stepnumber=1,
+  numbersep=8pt,
+  rulecolor=\color{black!10},
+  tabsize=2,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  captionpos=b
+}
+% Convenience environment
+\lstnewenvironment{code}{\lstset{style=codeModern}}{}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Page Geometry Layout
 
