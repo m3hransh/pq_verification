@@ -5,15 +5,31 @@
   publisher = {Cambridge University Press},
   location = {Cambridge},
   doi = {10.1017/CBO9780511530104},
-  url = {https://www.cambridge.org/core/books/purely-functional-data-structures/0409255DA1B48FA731859AC72E34D494},
+  url = {
+         https://www.cambridge.org/core/books/purely-functional-data-structures/0409255DA1B48FA731859AC72E34D494
+         },
   urldate = {2025-04-06},
-  abstract = {Most books on data structures assume an imperative language like C or C++. However, data structures for these languages do not always translate well to functional languages such as Standard ML, Haskell, or Scheme. This book describes data structures from the point of view of functional languages, with examples, and presents design techniques so that programmers can develop their own functional data structures. It includes both classical data structures, such as red-black trees and binomial queues, and a host of new data structures developed exclusively for functional languages. All source code is given in Standard ML and Haskell, and most of the programs can easily be adapted to other functional languages. This handy reference for professional programmers working with functional languages can also be used as a tutorial or for self-study.},
+  abstract = {Most books on data structures assume an imperative language like C
+              or C++. However, data structures for these languages do not always
+              translate well to functional languages such as Standard ML, Haskell
+              , or Scheme. This book describes data structures from the point of
+              view of functional languages, with examples, and presents design
+              techniques so that programmers can develop their own functional
+              data structures. It includes both classical data structures, such
+              as red-black trees and binomial queues, and a host of new data
+              structures developed exclusively for functional languages. All
+              source code is given in Standard ML and Haskell, and most of the
+              programs can easily be adapted to other functional languages. This
+              handy reference for professional programmers working with
+              functional languages can also be used as a tutorial or for
+              self-study.},
   isbn = {978-0-521-63124-2},
 }
 
 @inproceedings{rondonLiquidTypes2008,
   title = {Liquid Types},
-  booktitle = {Proceedings of the 29th {{ACM SIGPLAN Conference}} on {{Programming Language Design}} and {{Implementation}}},
+  booktitle = {Proceedings of the 29th {{ACM SIGPLAN Conference}} on {{
+               Programming Language Design}} and {{Implementation}}},
   author = {Rondon, Patrick M. and Kawaguci, Ming and Jhala, Ranjit},
   date = {2008-06-07},
   series = {{{PLDI}} '08},
@@ -23,14 +39,32 @@
   doi = {10.1145/1375581.1375602},
   url = {https://dl.acm.org/doi/10.1145/1375581.1375602},
   urldate = {2025-03-03},
-  abstract = {We present Logically Qualified Data Types, abbreviated to Liquid Types, a system that combines Hindley-Milner type inference with Predicate Abstraction to automatically infer dependent types precise enough to prove a variety of safety properties. Liquid types allow programmers to reap many of the benefits of dependent types, namely static verification of critical properties and the elimination of expensive run-time checks, without the heavy price of manual annotation. We have implemented liquid type inference in DSOLVE, which takes as input an OCAML program and a set of logical qualifiers and infers dependent types for the expressions in the OCAML program. To demonstrate the utility of our approach, we describe experiments using DSOLVE to statically verify the safety of array accesses on a set of OCAML benchmarks that were previously annotated with dependent types as part of the DML project. We show that when used in conjunction with a fixed set of array bounds checking qualifiers, DSOLVE reduces the amount of manual annotation required for proving safety from 31\% of program text to under 1\%.},
+  abstract = {We present Logically Qualified Data Types, abbreviated to Liquid
+              Types, a system that combines Hindley-Milner type inference with
+              Predicate Abstraction to automatically infer dependent types
+              precise enough to prove a variety of safety properties. Liquid
+              types allow programmers to reap many of the benefits of dependent
+              types, namely static verification of critical properties and the
+              elimination of expensive run-time checks, without the heavy price
+              of manual annotation. We have implemented liquid type inference in
+              DSOLVE, which takes as input an OCAML program and a set of logical
+              qualifiers and infers dependent types for the expressions in the
+              OCAML program. To demonstrate the utility of our approach, we
+              describe experiments using DSOLVE to statically verify the safety
+              of array accesses on a set of OCAML benchmarks that were previously
+              annotated with dependent types as part of the DML project. We show
+              that when used in conjunction with a fixed set of array bounds
+              checking qualifiers, DSOLVE reduces the amount of manual annotation
+              required for proving safety from 31\% of program text to under 1\%.
+              },
   isbn = {978-1-59593-860-2},
 }
 
 @article{vazou2018,
   title = {Refinement Reflection: Complete Verification with {{SMT}}},
   shorttitle = {Refinement Reflection},
-  author = {Vazou, Niki and Tondwalkar, Anish and Choudhury, Vikraman and Scott, Ryan G. and Newton, Ryan R. and Wadler, Philip and Jhala, Ranjit},
+  author = {Vazou, Niki and Tondwalkar, Anish and Choudhury, Vikraman and Scott,
+            Ryan G. and Newton, Ryan R. and Wadler, Philip and Jhala, Ranjit},
   date = {2018-01},
   journaltitle = {Proceedings of the ACM on Programming Languages},
   shortjournal = {Proc. ACM Program. Lang.},
@@ -40,7 +74,75 @@
   doi = {10.1145/3158141},
   url = {https://dl.acm.org/doi/10.1145/3158141},
   urldate = {2024-12-15},
-  abstract = {We introduce               Refinement Reflection               , a new framework for building SMT-based deductive verifiers. The key idea is to reflect the code implementing a user-defined function into the function’s (output) refinement type. As a consequence, at               uses               of the function, the function definition is instantiated in the SMT logic in a precise fashion that permits decidable verification. Reflection allows the user to write               equational proofs               of programs just by writing other programs using pattern-matching and recursion to perform case-splitting and induction. Thus, via the propositions-as-types principle, we show that reflection permits the               specification               of arbitrary functional correctness properties. Finally, we introduce a proof-search algorithm called               Proof by Logical Evaluation               that uses techniques from model checking and abstract interpretation, to completely automate equational reasoning. We have implemented reflection in Liquid Haskell and used it to verify that the widely used instances of the Monoid, Applicative, Functor, and Monad typeclasses actually satisfy key algebraic laws required to make the clients safe, and have used reflection to build the first library that actually verifies assumptions about associativity and ordering that are crucial for safe deterministic parallelism.},
+  abstract = {We introduce Refinement Reflection , a new framework for building
+              SMT-based deductive verifiers. The key idea is to reflect the code
+              implementing a user-defined function into the function’s (output)
+              refinement type. As a consequence, at uses of the function, the
+              function definition is instantiated in the SMT logic in a precise
+              fashion that permits decidable verification. Reflection allows the
+              user to write equational proofs of programs just by writing other
+              programs using pattern-matching and recursion to perform
+              case-splitting and induction. Thus, via the propositions-as-types
+              principle, we show that reflection permits the specification of
+              arbitrary functional correctness properties. Finally, we introduce
+              a proof-search algorithm called Proof by Logical Evaluation that
+              uses techniques from model checking and abstract interpretation, to
+              completely automate equational reasoning. We have implemented
+              reflection in Liquid Haskell and used it to verify that the widely
+              used instances of the Monoid, Applicative, Functor, and Monad
+              typeclasses actually satisfy key algebraic laws required to make
+              the clients safe, and have used reflection to build the first
+              library that actually verifies assumptions about associativity and
+              ordering that are crucial for safe deterministic parallelism.},
   issue = {POPL},
   langid = {english},
+}
+
+@book{knuth1973taocp3,
+  author = {Donald E. Knuth},
+  title = {The Art of Computer Programming, Volume 3: Sorting and Searching},
+  publisher = {Addison-Wesley},
+  year = {1973},
+  edition = {1st},
+  address = {Reading, Massachusetts},
+  isbn = {0-201-03803-X},
+}
+
+@techreport{crane1972,
+  author = {Clark Crane},
+  title = {Linear Lists and Priority Queues as Balanced Binary Trees},
+  institution = {Carnegie Mellon University},
+  year = {1972},
+  type = {Technical Report},
+}
+
+@article{vazou2014,
+  title = {Refinement Types For Haskell},
+  volume = {49},
+  issn = {978-1-4503-2873-9},
+  doi = {10.1145/2628136.2628161},
+  abstract = {{SMT}-based checking of refinement types for call-by-value
+              languages is a well-studied subject. Unfortunately, the classical
+              translation of refinement types to verification conditions is
+              unsound under lazy evaluation. When checking an expression, such
+              systems implicitly assume that all the free variables in the
+              expression are bound to values. This property is trivially
+              guaranteed by eager, but does not hold under lazy, evaluation. Thus
+              , to be sound and precise, a refinement type system for Haskell and
+              the corresponding verification conditions must take into account
+              which subset of binders actually reduces to values. We present a
+              stratified type system that labels binders as potentially diverging
+              or not, and that (circularly) uses refinement types to verify the
+              labeling. We have implemented our system in {LIQUIDHASKELL} and
+              present an experimental evaluation of our approach on more than 10,
+              000 lines of widely used Haskell libraries. We show that {
+              LIQUIDHASKELL} is able to prove 96\% of all recursive functions
+              terminating, while requiring a modest 1.7 lines of
+              termination-annotations per 100 lines of code.},
+  journal = {{ACM} {SIGPLAN} Notices},
+  shortjournal = {{ACM} {SIGPLAN} Notices},
+  author = {Vazou, Niki and Seidel, Eric and Jhala, Ranjit and Vytiniotis,
+            Dimitrios and Peyton Jones, Simon},
+  year = {2014},
+  date = {2014-08-19},
 }

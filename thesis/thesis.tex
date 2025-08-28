@@ -14,6 +14,10 @@
 \usepackage{titling}
 \usepackage{listings}
 \usepackage{xcolor}
+\usepackage{lmodern}
+% AMS extensions for math typesetting
+\usepackage[intlimits]{mathtools}
+\usepackage{amssymb}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -49,11 +53,11 @@
   morecomment=[s][\color{LHAnnot}\itshape]{\{-@}{@-\}},
   % Optional: emphasize common LH "keywords" (only visible when not inside {-@ @-},
   % but nice to keep consistent color if they appear in code comments, etc.)
-  morekeywords=[2]{measure,invariant,reflect,assume,assert,termination,ple,qualif,axiomatize},
+  morekeywords=[2]{measure,invariant,reflect,assume,assert,termination,ple,qualif,axiomatize, EmptyView, EmptyHeap, HeapNode, Min},
 % Function names you want emphasized:
-  morekeywords=[3]{insert,deleteMin,merge,findMin,rank, empty, isEmpty, splitMin},
+  morekeywords=[3]{insert,deleteMin,merge,findMin,rank, empty, isEmpty, splitMin, value, left, right, heapMerge, makeHeapNode},
   % Typeclasses or types you want emphasized:
-  morekeywords=[4]{Ord,Eq,Show,Functor,Monad,PriorityQueue},
+  morekeywords=[4]{Ord,Eq,Show,Functor,Monad,PriorityQueue, LeftistHeap},
   keywordstyle=\color{CodeKw}\bfseries,
   keywordstyle=[2]\color{LHKey}\bfseries,
   keywordstyle=[3]\color{FuncName}\bfseries,
@@ -79,8 +83,9 @@
   breakatwhitespace=true,
   captionpos=b
 }
-% Convenience environment
-\lstnewenvironment{code}{\lstset{style=codeModern}}{}
+\lstnewenvironment{code}[1][] % <— allow optional arguments
+  {\lstset{style=codeModern,#1}}
+  {}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Page Geometry Layout
 

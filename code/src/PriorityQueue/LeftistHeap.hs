@@ -134,8 +134,13 @@ heapSplit :: (Ord a) => LeftistHeap a -> MinView LeftistHeap a
 heapSplit EmptyHeap = EmptyView
 heapSplit (HeapNode x l r _) = Min x (heapMerge l r)
 
+safeHeapFindMin :: (Ord a) => LeftistHeap a -> Maybe a
+safeHeapFindMin EmptyHeap = Nothing
+safeHeapFindMin (HeapNode x _ _ _) = Just x
+
 instance PriorityQueue LeftistHeap where
   empty = EmptyHeap
+  findMin = safeHeapFindMin
   isEmpty = heapIsEmpty
   insert = heapInsert
   splitMin = heapSplit

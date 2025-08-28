@@ -1,26 +1,120 @@
-\chapter { Priority Queue Implementations }
-\section { Specification of Priority Queue Properties }
+\chapter{Priority Queue Implementations}
+\label{ch:implementations}
+\section{Specification of Priority Queue Interface}
 
-Priority queues or heaps are data structures that provide efficient access to the high priority element (often minimum element).
-that support the following operations:
+Priority queues are multisets with an associated priority for each element, allowing efficient retrieval of the element with the highest (or lowest) priority.
+To avoid confusion with FIFO queues, we will refer to them as "heaps" throughout this thesis.
 
+Typical operations include:
 \begin{itemize}
-	\item \textbf{Insert}: Add an element with a given priority.
-	\item \textbf{Find-Min}: Retrieve the element with the highest priority (lowest value).
-	\item \textbf{Delete-Min}: Remove the element with the highest priority.
-	\item \textbf{Merge}: Combine two priority queues into one.
+	\item \textbf{insert}: Add a new element with a given priority.
+	\item \textbf{findMin}: Retrieve the element with the minimum key (in the min-heap variant).
+	\item \textbf{splitMin}: Return a pair consisting of the minimum key and a heap with that minimum element removed.
+	\item \textbf{merge}: Combine two priority queues into one.
 \end{itemize}
 
-For the sake of simplicity, we will focus on the \textbf{min-heap} variant, where the element with the lowest value has the highest priority.
+Below is the specification of the priority queue interface, defined as a Haskell type class.
+\texttt{MinView} is a utility type to represent the result of the \texttt{splitMin} operation,
+which returns the minimum element and the remaining heap.
 
-\section { Leftist Heap Implementation }
-Haskell code, explanation, and verification.
+\begin{code}[caption={Leftist Heap Implementation in Haskell}, label={lst:pq}]
 
-\section { Binary Heap Implementation }
-Code structure, key invariants, and proof techniques.
+	data MinView q a =
+	EmptyView | Min {minValue :: a, restHeap :: q a}
+	deriving (Show, Eq)
 
-\section { Skew/Binomial/Pairing Heap (optional) }
-More advanced structure and proof techniques (if time allows).
+	class PriorityQueue pq where
+	empty :: (Ord a) => pq a
+	isEmpty :: (Ord a) => pq a -> Bool
+	findMin :: (Ord a) => pq a -> Maybe a
+	insert :: (Ord a) => a -> pq a -> pq a
+	splitMin :: (Ord a) => pq a -> MinView pq a
+\end{code}
 
-\section { Comparison of Implementations }
-Performance, expressiveness, and verification effort.
+Priority queues are widely used in computer science and engineering.
+They play a central role in \emph{operating systems} for task scheduling, in \emph{graph algorithms} such as Dijkstra’s shortest path and Prim’s minimum spanning tree, and in \emph{discrete event simulation}, where events are processed in order of occurrence time.
+Other applications include data compression (e.g., Huffman coding) and networking (packet scheduling).
+
+In this thesis, we focus on the \emph{min-priority queue}, where elements with lower keys are considered higher priority.
+We will study and verify functional implementations of \emph{Leftist Heaps} priority queues.
+
+% , \emph{Binary Heaps}, and an optional third variant such as Skew Heaps or Binomial Heaps %TODO: Might not be covered
+% Each implementation offers different trade-offs in terms of complexity, ease of reasoning, and verification effort.
+
+\section{Leftist Heap Implementation}
+
+Leftist heaps, introduced by Crane~\cite{crane1972} and discussed extensively by
+Knuth~\cite{knuth1973taocp3}, are a variant of binary heaps designed to support
+efficient merging. They are defined by two key invariants:
+
+\begin{itemize}
+	\item \textbf{Heap Property} – For every node, the stored key is less than or equal
+	      to the keys of its children. This ensures that the minimum element is always
+	      found at the root.
+
+	\item \textbf{Leftist Property} – For every node, the rank (also called the
+	      \emph{right spine length}, i.e., the length of the rightmost path from the node in question to an empty node)
+	      of the left child is greater than or equal to that of the right child.
+	      This property ensures that the right spine of the heap is kept as short as
+	      possible, which in turn guarantees logarithmic time complexity for merging
+	      operations.
+\end{itemize}
+
+We represent leftist heaps using a recursive algebraic data type in Haskell, as described by Okasaki~\cite{okasaki}:
+\begin{code}[caption={Leftist Heap data type}, label={lst:leftist}]
+	data LeftistHeap a
+	= EmptyHeap
+	| HeapNode
+		{ value :: a
+			, left  :: LeftistHeap a
+			, right :: LeftistHeap a
+			, rank  :: Int
+		}
+\end{code}
+
+Each node contains a value, its left subtree, right subtree, and its rank.
+
+The merge operation merges the right subtree of the heap with the smaller root value with the other heap. After merging,
+it adjusts the rank by swapping the left and right subtrees if necessary using the function \texttt{makeHeapNode}.
+\begin{code}[caption={Leftist Heap merge}, label={lst:leftist-merge}]
+
+	heapMerge :: (Ord a) => LeftistHeap a -> LeftistHeap a -> LeftistHeap a
+	heapMerge EmptyHeap EmptyHeap = EmptyHeap
+	heapMerge EmptyHeap h2@(HeapNode _ _ _ _) = h2
+	heapMerge h1@(HeapNode _ _ _ _) EmptyHeap = h1
+	heapMerge h1@(HeapNode x1 l1 r1 _) h2@(HeapNode x2 l2 r2 _)
+	| x1 <= x2 = makeHeapNode x1 l1 (heapMerge r1 h2)
+	| otherwise = makeHeapNode x2 l2 (heapMerge h1 r2)
+\end{code}
+Because the the right spine is kept short by the leftist property and at most is logarithmic, the merge operation runs in \(O(\log n)\) time.
+\begin{code}[caption={Leftist Heap helper functions}, label={lst:leftist-helpers}]
+
+	makeHeapNode :: a -> LeftistHeap a -> LeftistHeap a -> LeftistHeap a
+	makeHeapNode x h1 h2
+	| rrank h1 >= rrank h2 = HeapNode x h1 h2 (rrank h2 + 1)
+	| otherwise = HeapNode x h2 h1 (rrank h1 + 1)
+\end{code}
+
+Other functions are straightforward to implement.
+\begin{code}[]
+	heapEmpty :: (Ord a) => LeftistHeap a
+	heapEmpty = EmptyHeap
+
+	heapFindMin :: (Ord a) => LeftistHeap a -> Maybe a
+	heapFindMin EmptyHeap = Nothing
+	heapFindMin (HeapNode x _ _ _) = Just x
+
+	heapIsEmpty :: (Ord a) => LeftistHeap a -> Bool
+	heapIsEmpty EmptyHeap = True
+	heapIsEmpty _ = False
+
+	heapInsert :: (Ord a) => a -> LeftistHeap a -> LeftistHeap a
+	heapInsert x h = heapMerge (HeapNode x EmptyHeap EmptyHeap 1) h
+
+	heapSplit :: (Ord a) => LeftistHeap a -> MinView LeftistHeap a
+	heapSplit EmptyHeap = EmptyView
+	heapSplit (HeapNode x l r _) = Min x (heapMerge l r)
+\end{code}
+
+In the chapter \ref{ch:verification}, we will verify that these implementations satisfy the priority queue interface and maintain the leftist heap invariants.
+

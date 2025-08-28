@@ -1,11 +1,13 @@
 \chapter { Background and Related Work }
 \section { Functional Data Structures }
-Overview of functional programming principles and persistent data structures.
+Functional data structures are \emph{immutable}, meaning their state cannot be changed after creation, and \emph{persistent}, allowing access to previous versions of the structure.
+Combined with recursive algebraic data types (ADTs), this enables efficient and elegant implementations that are often easier to reason about compared to their imperative counterparts~\cite{okasaki}.
 
-\section { Priority Queues }
-Priority queues are multiset with an associated priority for each element, allowing efficient retrieval of the highest (or lowest) priority element.
-To avoid confusion with the term FIFO queues, we will refer to them as "priority heaps" throughout this thesis.
-Definition, applications, and various implementations (e.g., heaps, binomial queues).
+In contrast, imperative and mutable data structures permit in-place modifications, which can introduce side effects such as data races or unintended state changes in concurrent environments.
+By ensuring that each operation produces a new version of the structure without altering the original, functional data structures provide strong guarantees of referential transparency and purity.
+These properties not only improve modularity and composability but also facilitate formal reasoning and verification, since invariants are preserved across all versions of the structure~\cite{okasaki}.
+
+This thesis focuses on functional data structures, specifically priority queues, due to their suitability for formal verification and the rich body of existing research in this area.
 
 \section { Program Verification Techniques }
 Overview of Hoare logic, model checking, interactive theorem proving, etc.
