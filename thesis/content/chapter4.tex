@@ -1,12 +1,205 @@
 \chapter { Liquid Haskell }
-\section { Overview of Liquid Haskell }
-Setup, syntax, and capabilities.
+\texttt{LiquidHaskell} is a static verification tool that extends Haskell with
+\emph{refinement types}. In essence, it augments Haskell’s type system with
+logical predicates that are automatically checked by an SMT (Satisfiability
+Modulo Theories) solver \cite{vazou2014}. This combination makes it possible
+to verify properties of Haskell programs in a lightweight and automated way.
 
-\section { Specification Language }
-How to write and interpret refinement types.
+\texttt{LiquidHaskell} is implemented as a GHC plugin and works directly on standard
+Haskell code. Programmers can enrich type signatures with logical refinements,
+such as bounds on integers, shape properties of data structures, or functional
+invariants. During compilation, \texttt{LiquidHaskell} generates \emph{subtyping
+	queries} from these annotations and delegates them to an SMT solver. If the
+queries are valid, the program is accepted as verified; otherwise, Liquid
+Haskell produces verification errors.
 
-\section { Verification Workflow }
-From writing Haskell code to getting verified guarantees via Liquid Haskell.
+Compared to traditional interactive theorem provers, Liquid Haskell emphasizes
+automation and minimal annotation overhead. Its design philosophy is to
+preserve Haskell’s expressiveness while enabling program verification as a
+natural extension of the type system. This makes it particularly suitable for
+verifying properties of functional data structures, where invariants such as
+ordering, balance, or size constraints can be expressed concisely at the type
+level.
+
+In the remainder of this chapter, we present the specification language of
+\texttt{LiquidHaskell} (Section~\ref{sec:specification}), describe its verification
+workflow (Section~\ref{sec:workflow}), and discuss its strengths, limitations,
+and relation to other verification frameworks.
+
+\section {Type Refinement}
+\label{sec:specification}
+
+Refinement types extend conventional type systems by attaching logical predicates to types.
+This allows for more precise type specifications and can potentially detect more errors
+at compile time \cite{vazou2014}.
+
+Consider the following function:
+
+\begin{code}
+	divide :: Int -> Int -> Int
+\end{code}
+
+The standard type system ensures that the function \texttt{divide} takes two integers and
+returns an integer. For example, if we call \texttt{divide} with arguments of type
+\texttt{Bool}, the type system will show the error at compile time.
+However, it does not detect the error if the function is called with the second
+argument being zero.
+
+In a refinement type system, we can define more precise types.
+\texttt{LiquidHaskell} uses comments starting with \texttt{-@} and ending with \texttt{@-} to denote refinement type annotations.
+For example to define the \texttt{Nat} and \texttt{Pos} type, you can write:
+
+\begin{code}
+	{-@ type Nat = {v:Int | v >= 0} @-}
+	{-@ type Pos = {v:Int | v > 0} @-}
+\end{code}
+
+These types, also known as \texttt{Liquid Types} (\texttt{Logically Qualified Data Types}),
+have the form \texttt{\{ v:T | e \}}, where \texttt{T} is a Haskell type and \texttt{e} is a boolean expression
+which may contain the v variable and free variables from the context \cite{vazou2014}. This type represents all
+values \texttt{v} of type \texttt{T} that the expression \texttt{e} evaluates to true.
+
+In \texttt{LiquidHaskell}, integers and other constants (e.g., booleans, characters, etc.) are given a
+singleton type, meaning a type that has only one value \cite{niki_lecture_2024}. For instance, the liquid typing rule for integers is:
+\[
+	\frac{
+	}{
+		\Gamma \vdash i: \{Int \mid v = i\}
+	}
+	\quad (\mathit{T-Int})
+\]
+The environment $\Gamma$ can contain bindings of free variables to their respective types or any conditions that hold at
+the text location where the subtype relation is proved.
+In contrast to unrefined types, interge $i$ can have many different types due to rule of \textit{subtyping},
+which states that if $\tau_1$ is a subtype of $\tau_2$, then any expression of type $\tau_1$ can be used in a context that expects type $\tau_2$ \cite{vazou2014}.
+
+\[
+	\frac{
+		\Gamma \vdash e: \tau_1  \quad \Gamma \vdash \tau_1 \preceq \tau_2
+	}{
+		\Gamma \vdash e: \tau_2
+	}
+	\quad (\mathit{SUBTYPE})
+\]
+
+For instance if we assign an invalid value to a variable of type \texttt{Nat}:
+\begin{code}
+	{-@ x :: Nat @-}
+	x = -1
+\end{code}
+
+
+The refinement type checker based on the \(\mathit{T-Int}\) rule, expects that the expression \(-1\) should have type \(\{Int \mid v = -1\}\)
+and then be a subtype of the Nat type (i.e., when assigning a value to a variable of type Nat).
+It results in following subtype query $\emptyset \vdash \{v: Int \mid v = -1\} \preceq \{v: Int \mid v \geq 0 \}
+$
+Then it translated to euquivalent logical formula called verification condition (VC).
+According to the translation of the subtyping query into verification conditions (see Figure \ref{eq:subtyping-vc}),
+the type checker generates the following VC:
+
+\[
+	-1 = v \Rightarrow v \geq 0
+\]
+
+We can use these refinement types to annotate functions with
+preconditions and postconditions. For instance:
+\begin{code}
+	divide :: Nat -> Pos -> Int
+\end{code}
+
+This type signature specifies that the function \texttt{divide} takes a non-negative
+integer as its first argument and a positive integer as its second argument. Consequently, if we call
+\texttt{divide}, the type checker will verify if the specifications meet.
+For instance, the following function is rejected by the type checker:
+
+\begin{code}
+	bad :: Nat -> Nat -> Int
+	bad x y = x `div` y
+\end{code}
+To be able to verify this, the refinement type system translates the annotation into a so-called
+\textit{subtyping} query as follows \cite{vazou2014}:
+
+\begin{equation*}
+	\label{eq:subtyping}
+	\begin{matrix}
+		x : \{\,x : \mathrm{Int} \mid x \ge 0\}, \\
+
+		y : \{\,y : \mathrm{Int} \mid y \ge 0\}
+	\end{matrix}
+	\;\vdash\;
+	\{\,y : \mathrm{Int} \mid y \ge 0\}
+	\preceq
+	\;\{\,v : \mathrm{Int} \mid v > 0\}.
+\end{equation*}
+
+The notation $\Gamma  \vdash \tau_1 \preceq \tau_2$ means that in the type environment $\Gamma$,
+$\tau_1$ is a subtype of $\tau_2$. The subtype query states, given the type environment in which
+$x$ and $y$ have type \texttt{Nat}, the type of $y$ should be a subtype of \texttt{divide}'s second parameter $v$ where $v$ is a positive integer.
+The type system then translates this query into a verification condition (VC)- logical formulas whose validity ensures that the type
+specification is satisfied \cite{vazou2014}.
+The translation of the subtyping query to VCs is shown in Figure \ref{fig:notation}. Based on this
+translation we would have the following VC:
+
+\begin{equation}
+	\label{eq:subtyping-vc}
+	(x \ge 0) \land (y \ge 0)  \Rightarrow (v \ge 0) \Rightarrow (v > 0)
+\end{equation}
+\begin{figure}[htbp]
+	\centering
+	\renewcommand{\arraystretch}{1.4}
+	\begin{tabular}{@{}ll@{}}
+		\( (|\Gamma \vdash b_1 \preceq b_2|) \) & \( \doteq (|\Gamma|) \Rightarrow (|b_1|) \Rightarrow (|b_2|) \) \\[1ex]
+		\( (|\{x:\mathrm{Int} \mid r\}|) \)     & \( \doteq r \)                                                  \\[1ex]
+		\( (|x:\{v:\mathrm{Int} \mid r\}|) \)   & \( \doteq \text{``x is a value``} \Rightarrow r[x/v] \)         \\[1ex]
+		\( (|x:(y:\tau_y \to \tau)|) \)         & \( \doteq \text{true} \)                                        \\[1ex]
+		\( (|x_1:\tau_1,\ldots,x_n:\tau_n|) \)  & \( \doteq (|x_1:\tau_1|) \land \cdots \land (|x_n:\tau_n|) \)
+	\end{tabular}
+	\caption{Notation: Translation to VCs \cite{vazou2014}}
+	\label{fig:notation}
+\end{figure}
+
+This VC is meant to express that, under the environment where x and y are non-negative,
+the property “if v is non-negative then v is strictly positive" must hold.
+These VCs are then passed to an SMT solver to check their satisfiability.
+This is unsatisfiable since 0 is non-negative but not strictly positive,
+which is what the verifier should detect for the \texttt{bad} function.
+
+Refinement type systems are designed to exclude any arbitrary functions and only include formulas
+from decidable logics\cite{vazou2014}.
+\section { LiquidHaskell  Workflow }
+\label{sec:workflow}
+
+In this section, we will explain how to work with \texttt{LiquidHaskell}.
+It is available as a GHC plugin.
+To use it in your Haskell project, you need to add its dependencies to cabal file as following:
+
+\vspace{1em}
+\begin{lstlisting}
+ cabal-version: 1.12
+
+ name:           lh-plugin-demo
+ version:        0.1.0.0
+ ...
+ ...
+   build-depends:
+       liquid-prelude,
+       liquid-vector,
+       liquidhaskell,
+       base,
+       containers,
+       vector
+   default-language: Haskell2010
+   ghc-options:  -fplugin=LiquidHaskell
+\end{lstlisting}
+\vspace{1em}
+
+With these dependencies, \texttt{LiquidHaskell} can check your program at compile time or through a code linter in your preferred IDE.
+In the following sections, we explore various features of
+\texttt{LiquidHaskell} and demonstrate how it can be used to
+verify programs.
+
+
+
 
 \section { Strengths and Limitations }
 Where it excels and where it struggles (e.g., termination proofs, higher-order functions).

@@ -57,7 +57,7 @@ efficient merging. They are defined by two key invariants:
 	      of the left child is greater than or equal to that of the right child.
 	      This property ensures that the right spine of the heap is kept as short as
 	      possible, which in turn guarantees logarithmic time complexity for merging
-	      operations.
+	      operations\cite{okasaki}.
 \end{itemize}
 
 We represent leftist heaps using a recursive algebraic data type in Haskell, as described by Okasaki~\cite{okasaki}:
