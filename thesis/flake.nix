@@ -1,26 +1,45 @@
 {
   description = "LaTeX Document Demo";
   inputs = {
-    nixpkgs.url = github:NixOS/nixpkgs/nixos-24.05;
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
     flake-utils.url = "github:numtide/flake-utils";
 
   };
-  outputs = { self, nixpkgs, flake-utils }:
-    with flake-utils.lib; eachSystem allSystems (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+    }:
+    with flake-utils.lib;
+    eachSystem allSystems (
+      system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         tex = pkgs.texlive.combine {
-          inherit (pkgs.texlive) scheme-medium titling csquotes todonotes latexmk pgf biber koma-script biblatex blindtext nicematrix fontspec;
+          inherit (pkgs.texlive)
+            scheme-medium
+            titling
+            csquotes
+            todonotes
+            latexmk
+            pgf
+            biber
+            koma-script
+            biblatex
+            blindtext
+            nicematrix
+            fontspec
+            ;
         };
       in
       rec {
-
 
         devShell = pkgs.mkShell {
           name = "
           latex-demo-shell
           ";
-          buildInputs =  [ tex ];
+          buildInputs = [ tex ];
         };
 
         packages = {
@@ -30,7 +49,10 @@
           latex-demo-document
           ";
             src = self;
-            buildInputs = [ pkgs.coreutils tex ];
+            buildInputs = [
+              pkgs.coreutils
+              tex
+            ];
             phases = [
               "
           unpackPhase
@@ -61,6 +83,6 @@
           };
         };
         defaultPackage = packages.document;
-      });
+      }
+    );
 }
-
