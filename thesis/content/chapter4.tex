@@ -1,4 +1,4 @@
-\chapter { Liquid Haskell }
+\chapter { \texttt{LiquidHaskell} Overview }
 \texttt{LiquidHaskell} is a static verification tool that extends Haskell with
 \emph{refinement types}. In essence, it augments Haskell’s type system with
 logical predicates that are automatically checked by an SMT (Satisfiability
@@ -13,7 +13,7 @@ invariants. During compilation, \texttt{LiquidHaskell} generates \emph{subtyping
 queries are valid, the program is accepted as verified; otherwise, Liquid
 Haskell produces verification errors.
 
-Compared to traditional interactive theorem provers, Liquid Haskell emphasizes
+Compared to traditional interactive theorem provers, \texttt{LiquidHaskell} emphasizes
 automation and minimal annotation overhead. Its design philosophy is to
 preserve Haskell’s expressiveness while enabling program verification as a
 natural extension of the type system. This makes it particularly suitable for
@@ -22,185 +22,301 @@ ordering, balance, or size constraints can be expressed concisely at the type
 level.
 
 In the remainder of this chapter, we present the specification language of
-\texttt{LiquidHaskell} (Section~\ref{sec:specification}), describe its verification
-workflow (Section~\ref{sec:workflow}), and discuss its strengths, limitations,
+\texttt{LiquidHaskell} (Section~\ref{sec:specification}), and discuss its strengths, limitations,
 and relation to other verification frameworks.
 
-\section {Type Refinement}
+
+\section{Type Refinement}
 \label{sec:specification}
 
-Refinement types extend conventional type systems by attaching logical predicates to types.
-This allows for more precise type specifications and can potentially detect more errors
-at compile time \cite{vazou2014}.
+Refinement types extend conventional type systems by attaching logical predicates
+to base types. This enables more precise specifications and allows certain classes
+of errors to be detected statically at compile time \cite{vazou2014}.
 
 Consider the following function:
 
 \begin{code}
-	divide :: Int -> Int -> Int
+	lookup :: Int -> [Int] -> Int
+	lookup 0 (x : _) = x
+	lookup x (_ : xs) = lookup (x - 1) (xs)
 \end{code}
 
-The standard type system ensures that the function \texttt{divide} takes two integers and
-returns an integer. For example, if we call \texttt{divide} with arguments of type
-\texttt{Bool}, the type system will show the error at compile time.
-However, it does not detect the error if the function is called with the second
-argument being zero.
+The Haskell type system ensures that \texttt{lookup} takes an integers, a list of intergers and
+returns an integer. For example, an application \texttt{lookup True [3]} is rejected
+because the first argument has type \texttt{Bool}. However, the standard type
+system does not rule out the erroneous call \texttt{lookup -1 [3]}.
 
-In a refinement type system, we can define more precise types.
-\texttt{LiquidHaskell} uses comments starting with \texttt{-@} and ending with \texttt{@-} to denote refinement type annotations.
-For example to define the \texttt{Nat} and \texttt{Pos} type, you can write:
+Of course, we could use Haskell's \texttt{Maybe} type to indicate that the function
+returns \texttt{Nothing} for out-of-bounds indices. However, this merely shifts the
+handling of invalid inputs to the caller, who must remember to check for the \texttt{Nothing}.
+
+
+With refinement types, we can express stronger specifications. In
+\texttt{LiquidHaskell}, refinements are written inside comments marked by
+\texttt{-@} and \texttt{@-}. For instance, we can define non-negative integers as:
 
 \begin{code}
 	{-@ type Nat = {v:Int | v >= 0} @-}
-	{-@ type Pos = {v:Int | v > 0} @-}
 \end{code}
 
-These types, also known as \texttt{Liquid Types} (\texttt{Logically Qualified Data Types}),
-have the form \texttt{\{ v:T | e \}}, where \texttt{T} is a Haskell type and \texttt{e} is a boolean expression
-which may contain the v variable and free variables from the context \cite{vazou2014}. This type represents all
-values \texttt{v} of type \texttt{T} that the expression \texttt{e} evaluates to true.
-
-In \texttt{LiquidHaskell}, integers and other constants (e.g., booleans, characters, etc.) are given a
-singleton type, meaning a type that has only one value \cite{niki_lecture_2024}. For instance, the liquid typing rule for integers is:
+A refinement type has the general form
 \[
-	\frac{
-	}{
-		\Gamma \vdash i: \{Int \mid v = i\}
-	}
-	\quad (\mathit{T-Int})
+	\{\, v:T \mid e \,\},
 \]
-The environment $\Gamma$ can contain bindings of free variables to their respective types or any conditions that hold at
-the text location where the subtype relation is proved.
-In contrast to unrefined types, interge $i$ can have many different types due to rule of \textit{subtyping},
-which states that if $\tau_1$ is a subtype of $\tau_2$, then any expression of type $\tau_1$ can be used in a context that expects type $\tau_2$ \cite{vazou2014}.
+where \(T\) is a Haskell type and \(e\) is a logical predicate over the
+distinguished value variable \(v\). The type denotes the set of all values
+\(v:T\) for which \(e\) holds \cite{vazou2014}.
+
+For example, the type \(\{ v:\mathrm{Int} \mid v \geq 0 \}\) describes all
+non-negative integers. Constants such as integers and booleans are given
+singleton types, i.e., types that describe precisely one value
+\cite{niki_lecture_2024}. The typing rule for integer literals is:
 
 \[
-	\frac{
-		\Gamma \vdash e: \tau_1  \quad \Gamma \vdash \tau_1 \preceq \tau_2
-	}{
-		\Gamma \vdash e: \tau_2
-	}
+	\frac{}{ \Gamma \vdash i : \{\,v:\mathrm{Int} \mid v = i \,\} }
+	\quad (\mathit{T\text{-}Int})
+\]
+
+Here, the environment \(\Gamma\) contains bindings of program variables to
+their refinement types.
+One important aspect of refinement types is that expressions can be assigned
+to multiple types. For instance, the integer literal \(3\) has type \(\{ v:\mathrm{Int} \mid v = 3 \}\), but also
+any supertype, such as \(\{ v:\mathrm{Int} \mid v \geq 0 \}\).
+Crucially, refinement type systems support
+\emph{subtyping}: if \(\tau_1\) is a subtype of \(\tau_2\), then any expression
+of type \(\tau_1\) may safely be used where \(\tau_2\) is expected:
+
+\[
+	\frac{ \Gamma \vdash e : \tau_1 \quad \Gamma \vdash \tau_1 \preceq \tau_2 }
+	{ \Gamma \vdash e : \tau_2 }
 	\quad (\mathit{SUBTYPE})
 \]
 
-For instance if we assign an invalid value to a variable of type \texttt{Nat}:
+As an illustration, consider the invalid binding:
+
 \begin{code}
 	{-@ x :: Nat @-}
 	x = -1
 \end{code}
 
-
-The refinement type checker based on the \(\mathit{T-Int}\) rule, expects that the expression \(-1\) should have type \(\{Int \mid v = -1\}\)
-and then be a subtype of the Nat type (i.e., when assigning a value to a variable of type Nat).
-It results in following subtype query $\emptyset \vdash \{v: Int \mid v = -1\} \preceq \{v: Int \mid v \geq 0 \}
-$
-Then it translated to euquivalent logical formula called verification condition (VC).
-According to the translation of the subtyping query into verification conditions (see Figure \ref{eq:subtyping-vc}),
-the type checker generates the following VC:
-
+By rule \(\mathit{T\text{-}Int}\), the literal \(-1\) has type
+\(\{ v:\mathrm{Int} \mid v = -1 \}\). To assign it to \texttt{x} of type \texttt{Nat}, the
+checker must show:
 \[
-	-1 = v \Rightarrow v \geq 0
+	\emptyset \;\vdash\; \{ v:\mathrm{Int} \mid v = -1 \} \;\preceq\;
+	\{ v:\mathrm{Int} \mid v \geq 0 \}.
 \]
+This so called \emph{subtyping query} is then translated into a logical implication, known
+as a \emph{verification condition (VC)}:
+\[
+	(v = -1) \;\Rightarrow\; (v \geq 0).
+\]
+These logical formula then passed to an SMT solver for validation.
+Since the formula is unsatisfiable, the assignment is rejected.
 
-We can use these refinement types to annotate functions with
-preconditions and postconditions. For instance:
-\begin{code}
-	divide :: Nat -> Pos -> Int
-\end{code}
-
-This type signature specifies that the function \texttt{divide} takes a non-negative
-integer as its first argument and a positive integer as its second argument. Consequently, if we call
-\texttt{divide}, the type checker will verify if the specifications meet.
-For instance, the following function is rejected by the type checker:
-
-\begin{code}
-	bad :: Nat -> Nat -> Int
-	bad x y = x `div` y
-\end{code}
-To be able to verify this, the refinement type system translates the annotation into a so-called
-\textit{subtyping} query as follows \cite{vazou2014}:
-
-\begin{equation*}
-	\label{eq:subtyping}
-	\begin{matrix}
-		x : \{\,x : \mathrm{Int} \mid x \ge 0\}, \\
-
-		y : \{\,y : \mathrm{Int} \mid y \ge 0\}
-	\end{matrix}
-	\;\vdash\;
-	\{\,y : \mathrm{Int} \mid y \ge 0\}
-	\preceq
-	\;\{\,v : \mathrm{Int} \mid v > 0\}.
-\end{equation*}
-
-The notation $\Gamma  \vdash \tau_1 \preceq \tau_2$ means that in the type environment $\Gamma$,
-$\tau_1$ is a subtype of $\tau_2$. The subtype query states, given the type environment in which
-$x$ and $y$ have type \texttt{Nat}, the type of $y$ should be a subtype of \texttt{divide}'s second parameter $v$ where $v$ is a positive integer.
-The type system then translates this query into a verification condition (VC)- logical formulas whose validity ensures that the type
-specification is satisfied \cite{vazou2014}.
-The translation of the subtyping query to VCs is shown in Figure \ref{fig:notation}. Based on this
-translation we would have the following VC:
-
-\begin{equation}
-	\label{eq:subtyping-vc}
-	(x \ge 0) \land (y \ge 0)  \Rightarrow (v \ge 0) \Rightarrow (v > 0)
-\end{equation}
+Figure~\ref{fig:notation} summarizes the notation used to translate subtyping
+queries into VCs \cite{vazou2014}.
 \begin{figure}[htbp]
 	\centering
 	\renewcommand{\arraystretch}{1.4}
 	\begin{tabular}{@{}ll@{}}
 		\( (|\Gamma \vdash b_1 \preceq b_2|) \) & \( \doteq (|\Gamma|) \Rightarrow (|b_1|) \Rightarrow (|b_2|) \) \\[1ex]
 		\( (|\{x:\mathrm{Int} \mid r\}|) \)     & \( \doteq r \)                                                  \\[1ex]
-		\( (|x:\{v:\mathrm{Int} \mid r\}|) \)   & \( \doteq \text{``x is a value``} \Rightarrow r[x/v] \)         \\[1ex]
+		\( (|x:\{v:\mathrm{Int} \mid r\}|) \)   & \( \doteq \text{``x is a value''} \Rightarrow r[x/v] \)         \\[1ex]
 		\( (|x:(y:\tau_y \to \tau)|) \)         & \( \doteq \text{true} \)                                        \\[1ex]
 		\( (|x_1:\tau_1,\ldots,x_n:\tau_n|) \)  & \( \doteq (|x_1:\tau_1|) \land \cdots \land (|x_n:\tau_n|) \)
 	\end{tabular}
 	\caption{Notation: Translation to VCs \cite{vazou2014}}
 	\label{fig:notation}
 \end{figure}
+\subsection{Function Contracts}
+Refinements can also be used to specify function contracts, i.e., pre- and
+postconditions. For lookup, we can require that the index is non-negative and
+less than the length of the list:
 
-This VC is meant to express that, under the environment where x and y are non-negative,
-the property “if v is non-negative then v is strictly positive" must hold.
-These VCs are then passed to an SMT solver to check their satisfiability.
-This is unsatisfiable since 0 is non-negative but not strictly positive,
-which is what the verifier should detect for the \texttt{bad} function.
+\begin{code}
+	lookup :: i : Nat -> xs : {[a] | i < len xs} -> a
+\end{code}
 
-Refinement type systems are designed to exclude any arbitrary functions and only include formulas
-from decidable logics\cite{vazou2014}.
-\section { LiquidHaskell  Workflow }
-\label{sec:workflow}
+The type of second argument states that the list \texttt{xs} must have length greater than \texttt{i}.
+\texttt{len} is a function defined by \texttt{LiquidHaskell} in the refinement logic that returns the length of the list.
+In Section \ref{sec:reflection}, we will show how to define and use user-defined functions in the refinement logic.
 
-In this section, we will explain how to work with \texttt{LiquidHaskell}.
-It is available as a GHC plugin.
-To use it in your Haskell project, you need to add its dependencies to cabal file as following:
+\subsection{Refined Data Types}
+In the previous examples, we saw how refinements of input and output of function allow us to have stronger arguments about our program.
+We can take this further by refining the data types.
+We use the following example as an illustration, following~\cite{jhala2020}:
+\begin{code}
+	data Slist a = Slist { size :: Int, elems :: [a] }
+
+	{-@ data Slist a = Slist { size :: Nat, elems :: {v:[a] | len v == size} } @-}
+\end{code}
+
+This refined \textit{Slist} data type ensures the stored `size` always matches the length of the `elems` list,
+as formalized in the refinement annotation.
+This ensures that the size of the list is always correct.
+
+In the following section, we show how can we use reflection or measure directives to reason about user-defined Haskell function in the refinement logic.
+
+\subsection{Lifting Functions to the Refinement Logic}
+\label{sec:reflection}
+When our programs become more complex, we need to define our own functions in the refinement logic and reason about
+a function within another function. Refinement Reflection allows deep specification and verification by
+reflecting the code implementing a Haskell function into the function’s output refinement type \cite{vazou2018}.
+That means we are able to reason about the function's behavior directly in the refinement logic.
+There are two ways to do this: \texttt{reflection} and \texttt{measure}.
+
+\texttt{Measure} can be used on a function with one argument which is a Algebraic Data Type (ADT), like a list \cite{niki_lecture_2024}.
+Consider the data type of a bag (multiset) defined as a map from elements to their multiplicities:
+\begin{code}
+	data Bag a = Bag { toMap :: M.Map a Int } deriving Eq
+\end{code}
+
+Now we can define a measure \texttt{bag} that computes the bag of elements in for a list:
+\begin{code}
+
+	{-@ measure bag @-}
+	{-@ bag :: Ord a => [a]-> Bag a @-}
+	bag :: (Ord a) => [a] -> Bag a
+	bag [] = B.empty
+	bag (x : xs) = B.put x (bag xs)
+\end{code}
+
+\texttt{LiquidHaskell} lifts the Haskell function to the refinement logic, by refining the types of the data constructors with the
+definition of the function\cite{niki_lecture_2024}.
+For example, \texttt{bag} measure definition refines the type of the \texttt{List}'s constructor to be:
+\begin{code}
+	Nil  :: {v:List a | bag v = B.empty}
+	Cons :: x:a -> l:List a -> {v:List a | bag v = B.put x (bag l)}
+\end{code}
+
+Thus, we can use the \texttt{bag} function in the refinement logic to reason about
+invariants of the \texttt{List} data type. For instance, in the following example:
+\begin{code}
+	{-@ equalBagExample1 :: { bag(Cons 1 (Cons 3 Nil)) ==  bag( Cons 2 Nil) } @-}
+
+	>>    VV : {v : () | v == GHC.Tuple.Prim.()}
+	>>    .
+	>>    is not a subtype of the required type
+	>>      VV : {VV##2465 : () | bag (Cons 1 (Cons 3 Nil)) == bag (Cons 2 Nil)}
+\end{code}
+
+The \texttt{\{x = y\}} is shorthand for \texttt{\{v :() | x = y\}}, where $x$ and $y$ are expressions.
+This formulation is motivated by the fact that the equality predicate $x = y$ is a condition that does not depend on any particular value.
+Note that equality for bags is defined as the equality of the underlying maps that already have a built-in equality function.
+
+
+Reflection is another useful feature that allows the user to define a function in the refinement logic, providing
+the SMT solver with the function's behavior \cite{vazou2018}.
+This has the advantage of allowing the user to lift in the logic functions with more than one argument, but the verification
+is no more automated \cite{niki_lecture_2024}.
+Additionally, with the use of a library of combinators provided by \texttt{LiquidHaskell}, we can leverage
+the existing programming constructs (e.g. pattern-matching and recursion) to prove the correctness of the
+program and use the principle of programs-as-proofs.
+(known as Curry-Howard isomorphism)\cite{vazou2018, wadler_propositions_2015}.
+
+To illustrate the use of reflection, we define the \texttt{(++)} function in the refinement logic as follows:
+
+\begin{code}
+	{-@ LIQUID "--reflection" @-}
+	{-@ infixr ++ @-}
+	{-@ reflect ++ @-}
+
+	{-@ (++) :: xs:[a] -> ys:[a] -> { zs:[a] | len zs == len xs + len ys } @-}
+	(++) :: [a] -> [a] -> [a]
+	[] ++ ys = ys
+	(x : xs) ++ ys = x : (xs ++ ys)
+\end{code}
+The \texttt{\{-@ LIQUID "--reflection" @-\}} annotation used to activate the reflection feature in \texttt{LiquidHaskell}.
+The \texttt{reflect} annotation, lift the \texttt{(++)} into the logic in three steps \cite{vazou2018}:
+\begin{enumerate}
+	\item \textbf{Definition}: The annotation creates an \textit{uninterpreted function} \texttt{
+	      (++) :: [a] -> [a] -> [a]} in the refinement logic. By uninterpreted, we mean that the logical \texttt{(++)} is
+	      not connected to the program function \texttt{(++)}; in the logic, \texttt{(++)} only satisfies the \textit{congruence axiom}.
+	\item \textbf{Reflection}: In this step, \texttt{LiquidHaskell} reflects the definition of \texttt{(++)} into its refinement type
+	      by automatically strengthening the defined function type for \texttt{(++)} to:
+
+
+\begin{code}
+  (++) :: xs:[a] -> ys:[a] 
+      -> { zs:[a] | len zs == len xs + len ys 
+          && zs = xs ++ ys
+          && ppProp xs ys }
+\end{code}
+	      where \texttt{ppProp} is an alias for the following refinement, derived from the function's definition:
+\begin{code}
+  ppProp xs ys = if xs == [] then ys
+  else cons (head xs) (ppProp (tail xs) ys)
+
+\end{code}
+	\item \textbf{Application}: With the reflected refinement type, each application of \texttt{(++)}
+	      in the code automatically unfolds the definition of \texttt{(++)} only \textit{once} in the logic. In the
+	      next section, we will look into \texttt{PLE} that allows to unfold the definition of the function multiple times.
+\end{enumerate}
+we can now reason about properties of \texttt{(++)} in the refinement logic that requires unfolding its definition,
+as opposed to treating it only as an uninterpreted function.
+In the following subsection, 
+we will show how to use \texttt{LiquidHaskell} to verify that the \texttt{(++)} function is associative.
+
+\subsection{Equational Proofs}
+\texttt{LiquidHaskell} allows formulation of proofs following the style of calculational or equational reasoning popularized in classic texts
+and implemented in proof assistants like Coq and Agda \cite{vazou2018}.
+It comes with the proof combinators library that allows to make the proofs more readable.
+For example, it defines the following proof combinators:
+
+\begin{code}[label={lst:proof-combinators}]
+  type Proof = ()
+
+  {-@ (===) :: x:a -> y:{a | y == x} -> {v:a | v == x && v == y} @-}
+  (===) :: a -> a -> a
+  _ === y  = y
+
+  data QED = QED
+
+  (***) :: a -> QED -> Proof
+  _***_ = ()
+
+  {-@ (?) :: forall a b <pa :: a -> Bool, pb :: b -> Bool>. a<pa> -> b<pb> -> a<pa> @-}
+  (?) :: a -> b -> a
+  x ? _ = x
+
+  {-@ withProof :: x:a -> b -> {v:a | v = x} @-}
+  {-@ define withProof    x      y            = (x) @-}
+  withProof :: a -> b -> a
+  withProof x _ = x
+\end{code}
 
 \vspace{1em}
-\begin{lstlisting}
- cabal-version: 1.12
 
- name:           lh-plugin-demo
- version:        0.1.0.0
- ...
- ...
-   build-depends:
-       liquid-prelude,
-       liquid-vector,
-       liquidhaskell,
-       base,
-       containers,
-       vector
-   default-language: Haskell2010
-   ghc-options:  -fplugin=LiquidHaskell
-\end{lstlisting}
+\texttt{Proof} is a type alias for the unit type \texttt{()}, representing the result of a completed proof. The \texttt{(***)} function takes a value of type \texttt{a} and a value of type \texttt{QED}, returning \texttt{Proof} (i.e., \texttt{()}), and is used to mark the end of a proof. The \texttt{(===)} function proves equality, taking \texttt{x:a} and \texttt{y:\{a | y == x\}}, returning a value with refinement \texttt{\{v:a | v == x \&\& v == y\}}.
+
+Both \texttt{(?)} and \texttt{withProof} return their first argument, but differ in Liquid Haskell’s equational proofing:
+\begin{itemize}
+  \item \texttt{(?)}: With type \texttt{a<pa> -> b<pb> -> a<pa>}, it preserves the refinement \texttt{pa} of the input, making it ideal for maintaining properties across proof steps.
+  \item \texttt{withProof}: With type \texttt{x:a -> b -> \{v:a | v = x\}}, it asserts output equality to the input (\texttt{v = x}), suited for establishing equalities to chain with \texttt{(===)} in equational reasoning.
+\end{itemize}
+
+In the following example, we show how to use these combinators to verify that the \texttt{(++)} function is associative:
+
+
+\begin{code}[ label={lst:associative}]
+{-@ assoc :: xs:[a] -> ys:[a] -> zs:[a] 
+  -> { (xs ++ ys) ++ zs = xs ++ (ys ++ zs) } @-}
+assoc :: [a] -> [a] -> [a] -> ()
+assoc [] ys zs = ([] ++ ys) ++ zs
+               === ys ++ zs
+               === [] ++ (ys ++ zs)
+               *** QED
+
+assoc (x : xs) ys zs = ((x : xs) ++ ys) ++ zs
+                     ===  x : (xs ++ ys) ++ zs
+                     === x : ((xs ++ ys) ++ zs) ? assoc xs ys zs
+                     === (x : xs) ++ (ys ++ zs)
+                     *** QED
+\end{code}
 \vspace{1em}
 
-With these dependencies, \texttt{LiquidHaskell} can check your program at compile time or through a code linter in your preferred IDE.
-In the following sections, we explore various features of
-\texttt{LiquidHaskell} and demonstrate how it can be used to
-verify programs.
-
-
-
-
+As you can see, we use proof by induction and in the induction step we use recursive call in the last step.
 \section { Strengths and Limitations }
 Where it excels and where it struggles (e.g., termination proofs, higher-order functions).
 \section { Related Work }
