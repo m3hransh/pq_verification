@@ -237,82 +237,90 @@ The \texttt{reflect} annotation, lift the \texttt{(++)} into the logic in three 
 	      by automatically strengthening the defined function type for \texttt{(++)} to:
 
 
-\begin{code}
-  (++) :: xs:[a] -> ys:[a] 
-      -> { zs:[a] | len zs == len xs + len ys 
-          && zs = xs ++ ys
-          && ppProp xs ys }
-\end{code}
+	      \begin{code}
+		      (++) :: xs:[a] -> ys:[a]
+		      -> { zs:[a] | len zs == len xs + len ys
+		      && zs = xs ++ ys
+		      && ppProp xs ys }
+	      \end{code}
 	      where \texttt{ppProp} is an alias for the following refinement, derived from the function's definition:
-\begin{code}
-  ppProp xs ys = if xs == [] then ys
-  else cons (head xs) (ppProp (tail xs) ys)
+	      \begin{code}
+		      ppProp xs ys = if xs == [] then ys
+		      else cons (head xs) (ppProp (tail xs) ys)
 
-\end{code}
+	      \end{code}
 	\item \textbf{Application}: With the reflected refinement type, each application of \texttt{(++)}
 	      in the code automatically unfolds the definition of \texttt{(++)} only \textit{once} in the logic. In the
 	      next section, we will look into \texttt{PLE} that allows to unfold the definition of the function multiple times.
 \end{enumerate}
 we can now reason about properties of \texttt{(++)} in the refinement logic that requires unfolding its definition,
 as opposed to treating it only as an uninterpreted function.
-In the following subsection, 
+In the following subsection,
 we will show how to use \texttt{LiquidHaskell} to verify that the \texttt{(++)} function is associative.
 
 \subsection{Equational Proofs}
 \texttt{LiquidHaskell} allows formulation of proofs following the style of calculational or equational reasoning popularized in classic texts
 and implemented in proof assistants like Coq and Agda \cite{vazou2018}.
 It comes with the proof combinators library that allows to make the proofs more readable.
-For example, it defines the following proof combinators:
 
-\begin{code}[label={lst:proof-combinators}]
-  type Proof = ()
-
-  {-@ (===) :: x:a -> y:{a | y == x} -> {v:a | v == x && v == y} @-}
-  (===) :: a -> a -> a
-  _ === y  = y
-
-  data QED = QED
-
-  (***) :: a -> QED -> Proof
-  _***_ = ()
-
-  {-@ (?) :: forall a b <pa :: a -> Bool, pb :: b -> Bool>. a<pa> -> b<pb> -> a<pa> @-}
-  (?) :: a -> b -> a
-  x ? _ = x
-
-  {-@ withProof :: x:a -> b -> {v:a | v = x} @-}
-  {-@ define withProof    x      y            = (x) @-}
-  withProof :: a -> b -> a
-  withProof x _ = x
+\paragraph{Proof Type.}
+\begin{code}[label={lst:proof-type}]
+	type Proof = ()
 \end{code}
+The alias \texttt{Proof} is defined as the unit type \texttt{()}, representing the result of a completed proof.
 
-\vspace{1em}
+\paragraph{Equality Combinator.}
+\begin{code}[label={lst:proof-eq}]
+	{-@ (===) :: x:a -> y:{a | y == x} -> {v:a | v == x && v == y} @-}
+	(===) :: a -> a -> a
+	_ === y = y
+\end{code}
+The \texttt{(===)} function proves equality. It takes \texttt{x:a} and \texttt{y:\{a | y == x\}}, returning a value refined as \texttt{\{v:a | v == x \&\& v == y\}}.
 
-\texttt{Proof} is a type alias for the unit type \texttt{()}, representing the result of a completed proof. The \texttt{(***)} function takes a value of type \texttt{a} and a value of type \texttt{QED}, returning \texttt{Proof} (i.e., \texttt{()}), and is used to mark the end of a proof. The \texttt{(===)} function proves equality, taking \texttt{x:a} and \texttt{y:\{a | y == x\}}, returning a value with refinement \texttt{\{v:a | v == x \&\& v == y\}}.
+\paragraph{QED Marker.}
+\begin{code}[label={lst:proof-qed}]
+	data QED = QED
 
-Both \texttt{(?)} and \texttt{withProof} return their first argument, but differ in Liquid Haskell’s equational proofing:
-\begin{itemize}
-  \item \texttt{(?)}: With type \texttt{a<pa> -> b<pb> -> a<pa>}, it preserves the refinement \texttt{pa} of the input, making it ideal for maintaining properties across proof steps.
-  \item \texttt{withProof}: With type \texttt{x:a -> b -> \{v:a | v = x\}}, it asserts output equality to the input (\texttt{v = x}), suited for establishing equalities to chain with \texttt{(===)} in equational reasoning.
-\end{itemize}
+	(***) :: a -> QED -> Proof
+	_ *** _ = ()
+\end{code}
+The \texttt{QED} data type is used to signal the end of a proof. The \texttt{(***)} operator takes a value and a \texttt{QED}, returning \texttt{Proof} (i.e., \texttt{()}).
+
+\paragraph{Question-Mark Combinator.}
+\begin{code}[label={lst:proof-question}]
+	{-@ (?) :: forall a b <pa :: a -> Bool, pb :: b -> Bool>. a<pa> -> b<pb> -> a<pa> @-}
+	(?) :: a -> b -> a
+	x ? _ = x
+\end{code}
+The \texttt{(?)} combinator preserves refinements. With type \texttt{a<pa> -> b<pb> -> a<pa>}, it maintains the refinement \texttt{pa} of the first argument, allowing properties to be carried across proof steps.
+
+\paragraph{WithProof Combinator.}
+\begin{code}[label={lst:proof-withproof}]
+	{-@ withProof :: x:a -> b -> {v:a | v = x} @-}
+	{-@ define withProof x y = (x) @-}
+	withProof :: a -> b -> a
+	withProof x _ = x
+\end{code}
+The \texttt{withProof} combinator enforces equality between input and output.
+With type \texttt{x:a -> b -> \{v:a | v = x\}}, it asserts that the returned value is exactly \texttt{x}, making it useful for chaining with \texttt{(===)} in equational reasoning.
 
 In the following example, we show how to use these combinators to verify that the \texttt{(++)} function is associative:
 
 
 \begin{code}[ label={lst:associative}]
-{-@ assoc :: xs:[a] -> ys:[a] -> zs:[a] 
-  -> { (xs ++ ys) ++ zs = xs ++ (ys ++ zs) } @-}
-assoc :: [a] -> [a] -> [a] -> ()
-assoc [] ys zs = ([] ++ ys) ++ zs
-               === ys ++ zs
-               === [] ++ (ys ++ zs)
-               *** QED
+	{-@ assoc :: xs:[a] -> ys:[a] -> zs:[a]
+	-> { (xs ++ ys) ++ zs = xs ++ (ys ++ zs) } @-}
+	assoc :: [a] -> [a] -> [a] -> ()
+	assoc [] ys zs = ([] ++ ys) ++ zs
+	=== ys ++ zs
+	=== [] ++ (ys ++ zs)
+	*** QED
 
-assoc (x : xs) ys zs = ((x : xs) ++ ys) ++ zs
-                     ===  x : (xs ++ ys) ++ zs
-                     === x : ((xs ++ ys) ++ zs) ? assoc xs ys zs
-                     === (x : xs) ++ (ys ++ zs)
-                     *** QED
+	assoc (x : xs) ys zs = ((x : xs) ++ ys) ++ zs
+	===  x : (xs ++ ys) ++ zs
+	=== x : ((xs ++ ys) ++ zs) ? assoc xs ys zs
+	=== (x : xs) ++ (ys ++ zs)
+	*** QED
 \end{code}
 \vspace{1em}
 
