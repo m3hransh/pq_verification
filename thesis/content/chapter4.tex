@@ -56,7 +56,9 @@ With refinement types, we can express stronger specifications. In
 \texttt{-@} and \texttt{@-}. For instance, we can define non-negative integers as:
 
 \begin{code}
-	{-@ type Nat = {v:Int | v >= 0} @-}
+	{-@ x :: {v:Int | v >= 0} @-}
+	x :: Int
+	x = 2
 \end{code}
 
 A refinement type has the general form
@@ -68,7 +70,17 @@ distinguished value variable \(v\). The type denotes the set of all values
 \(v:T\) for which \(e\) holds \cite{vazou2014}.
 
 For example, the type \(\{ v:\mathrm{Int} \mid v \geq 0 \}\) describes all
-non-negative integers. Constants such as integers and booleans are given
+non-negative integers.
+For brevity, one can use type aliases or predicates to define commonly used refinements or predicates:
+
+\begin{code}
+	predicate Btwn Lo N Hi = Lo <= N && N < Hi
+	type Nat =  {v:Int | v >= 0}
+\end{code}
+Additionally, Holes can be used for Haskell types, as those types can be infereded from the
+regualar Haskell type signature or via GHC's type inference \cite{vazou_liquidhaskell_2014}.
+
+In \texttt{LiquidHaskell}, Constants such as integers and booleans are given
 singleton types, i.e., types that describe precisely one value
 \cite{niki_lecture_2024}. The typing rule for integer literals is:
 
@@ -172,7 +184,7 @@ Consider the data type of a bag (multiset) defined as a map from elements to the
 	data Bag a = Bag { toMap :: M.Map a Int } deriving Eq
 \end{code}
 
-Now we can define a measure \texttt{bag} that computes the bag of elements in for a list:
+Now we can define a measure \texttt{bag} that computes the bag of elements for a list:
 \begin{code}
 
 	{-@ measure bag @-}
@@ -307,7 +319,7 @@ With type \texttt{x:a -> b -> \{v:a | v = x\}}, it asserts that the returned val
 In the following example, we show how to use these combinators to verify that the \texttt{(++)} function is associative:
 
 
-\begin{code}[ label={lst:associative}]
+\begin{code}[ label=lst:associative]
 	{-@ assoc :: xs:[a] -> ys:[a] -> zs:[a]
 	-> { (xs ++ ys) ++ zs = xs ++ (ys ++ zs) } @-}
 	assoc :: [a] -> [a] -> [a] -> ()
@@ -325,6 +337,40 @@ In the following example, we show how to use these combinators to verify that th
 \vspace{1em}
 
 As you can see, we use proof by induction and in the induction step we use recursive call in the last step.
+
+\subsection{Termination}
+One crucial aspect of LiquidHaskell is ensuring that all functions terminate.
+This is required for the soundness of the refinement type system, as non-terminating functions can lead to inconsistencies in the logic \cite{niki_lecture_2024}.
+To ensure this, it employs three mechanisms :
+\begin{enumerate}
+	\item \textit{Structural Termination}:This is a first method that \texttt{LiquidHaskell} will look to verify that recursive calls in functions operating on data types are made with a smaller part of the input.
+	      If this verification fails, either due to the function not being defined on a data type or the recursive calls not being on a subpart, then \texttt{LiquidHaskell} offers two following alternative methods to ensure termination.
+	\item \textit{Terrmination Heuristic}: The first argument that can be "sized"-- there is measure function that turned into \texttt{Nat}--
+	      should be decreasing and non negative in recursive calls.
+
+	\item \textit{Termination Metrics}: user provide, integer expressions tha can depend on the function arguments and are used to check termination.
+\end{enumerate}
+In code \ref{lst:associative}, the \texttt{assoc} function is terminating because the recursive call is made on the tail of the list, which is a subpart of the input list.
+
+\subsection{Proof by Logical Evaluation}
+In our proof in code \ref{lst:associative}, for the most parts we used trivial unfolding of \texttt{(++)} function definition.
+However, \texttt{LiquidHaskell} offer a tactic called \texttt{Proof by Logical Evaluation} (PLE)
+that provides two key features \cite{vazou2018}. First, it is guaranteed to find an equational proof if one can be constructed
+from unfoldings of function definitions (The user must still provide lemmas and induction hypotheses) \cite{vazou2018}.
+We can activate PLE by adding \texttt{\{-@ LIQUID "---ple" @-\}} annotation to automate the most parts of the proof for associativity of \texttt{(++)}:
+
+\begin{code}
+	{-@ LIQUID "--ple" @-}
+	{-@ assoc :: xs:[a] -> ys:[a] -> zs:[a]
+	-> { (xs ++ ys) ++ zs = xs ++ (ys ++ zs) } @-}
+	assoc :: [a] -> [a] -> [a] -> ()
+	assoc [] ys zs = ()
+	assoc (x : xs) ys zs = assoc xs ys zs
+\end{code}
+
+In the above code, we only need to provide the base case and induction hypotheses, and
+\texttt{LiquidHaskell} will automatically unfold the definition of \texttt{(++)} to prove the associativity of the function.
+In the next section, we go through an example application of \texttt{LiquidHaskell}.
 \section { Strengths and Limitations }
 Where it excels and where it struggles (e.g., termination proofs, higher-order functions).
 \section { Related Work }
