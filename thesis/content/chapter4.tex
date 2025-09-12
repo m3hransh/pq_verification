@@ -274,6 +274,7 @@ we will show how to use \texttt{LiquidHaskell} to verify that the \texttt{(++)} 
 In addition to reflection and measures, \texttt{LiquidHaskell} provides powerful abstraction mechanisms for refinement types.
 Suppose we want to define a list where elements satisfy a relation with their neighbors. We can use \texttt{Refinement Abstraction} to define a new data type that abstracts over the refinement predicate \cite{vazou_liquidhaskell_2014}:
 
+\todo[inline]{Add picture for showing the structure of the list}
 \begin{code}
 	data PList a <p :: a -> a -> Bool> =
 	Nil
@@ -382,6 +383,7 @@ To ensure this, it employs three mechanisms :
 \end{enumerate}
 In code \ref{lst:associative}, the \texttt{assoc} function is terminating because the recursive call is made on the tail of the list, which is a subpart of the input list.
 
+\todo[inline]{Expand on this section with examples}
 \subsection{Proof by Logical Evaluation}
 In our proof in code \ref{lst:associative}, for the most parts we used trivial unfolding of \texttt{(++)} function definition.
 However, \texttt{LiquidHaskell} offer a tactic called \texttt{Proof by Logical Evaluation} (PLE)
