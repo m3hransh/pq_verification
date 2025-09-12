@@ -38,9 +38,9 @@ To express these invariants and reason about the behavior of our functions, we u
 
 \textbf{Measures} are functions from Haskell's term-level to the refinement logic's domain. We define several measures:
 \begin{itemize}
-    \item \texttt{size}: Computes the total number of nodes in the heap.
-    \item \texttt{rrank}: Returns the rank of a heap, which is crucial for the leftist property.
-    \item \texttt{bag}: Converts the heap into a multiset (or bag) of its elements. This is invaluable for proving that operations like \texttt{heapMerge} do not lose or duplicate elements.
+	\item \texttt{size}: Computes the total number of nodes in the heap.
+	\item \texttt{rrank}: Returns the rank of a heap, which is crucial for the leftist property.
+	\item \texttt{bag}: Converts the heap into a multiset (or bag) of its elements. This is invaluable for proving that operations like \texttt{heapMerge} do not lose or duplicate elements.
 \end{itemize}
 
 \textbf{Reflected Functions} allow us to use standard Haskell functions within the refinement logic. We use this for \texttt{isLowerBound}, \texttt{heapMerge}, and \texttt{makeHeapNode}. This allows us to reason about their behavior during verification.
@@ -86,8 +86,8 @@ This lemma states that if \texttt{x1} is a lower bound for \texttt{r1} and \text
 
 With \texttt{heapMerge} verified, the correctness of other operations follows more easily:
 \begin{itemize}
-    \item \texttt{heapInsert x h} is simply \texttt{heapMerge (HeapNode x EmptyHeap EmptyHeap 1) h}.
-    \item \texttt{heapDeleteMin h} (or \texttt{splitMin}) is \texttt{heapMerge} of the left and right children of the root.
+	\item \texttt{heapInsert x h} is simply \texttt{heapMerge (HeapNode x EmptyHeap EmptyHeap 1) h}.
+	\item \texttt{heapDeleteMin h} (or \texttt{splitMin}) is \texttt{heapMerge} of the left and right children of the root.
 \end{itemize}
 The properties proven for \texttt{heapMerge} are thus inherited by these functions.
 
@@ -96,6 +96,7 @@ Liquid Haskell must ensure that all recursive functions terminate. For \texttt{h
 \begin{verbatim}
 / [size h1, size h2, 0]
 \end{verbatim}
+\todo[inline]{Explain the metric why 0 is used}
 This specifies a lexicographically ordered tuple. Liquid Haskell verifies that for every recursive call within \texttt{heapMerge}, this metric decreases. In our case, one of the heaps is replaced by its right child, which is strictly smaller, thus decreasing the total size and ensuring termination. The lemmas also have termination metrics that are checked by the verifier.
 
 \section{Challenges and Workarounds}

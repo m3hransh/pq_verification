@@ -19,6 +19,7 @@
 \usepackage[intlimits]{mathtools}
 \usepackage{amssymb}
 
+\usepackage{todonotes}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Requirements
@@ -54,11 +55,11 @@
   % Highlight @-words inside Liquid Haskell comments:
   % Optional: emphasize common LH "keywords" (only visible when not inside {-@ @-},
   % but nice to keep consistent color if they appear in code comments, etc.)
-  morekeywords=[2]{measure,invariant,reflect,assume,assert,termination,ple,qualif,axiomatize, EmptyView, EmptyHeap, HeapNode, Min},
+  morekeywords=[2]{measure,invariant,reflect,assume,assert,termination,ple,qualif,axiomatize, EmptyView, EmptyHeap, HeapNode, Min, Nil, Cons},
 % Function names you want emphasized:
-  morekeywords=[3]{insert,deleteMin,merge,findMin,rank, lookup, empty, isEmpty, splitMin, value, left, right, heapMerge, makeHeapNode, divide, bad, div, isLowerBound, HeapMergeMin, heapIsEmpty, BagUnion, heapFindMin},
+  morekeywords=[3]{insert,deleteMin,merge,put, bag,findMin, rank, lookup, empty, isEmpty, splitMin, value, left, right, heapMerge, makeHeapNode, divide, bad, div, isLowerBound, HeapMergeMin, heapIsEmpty, BagUnion, heapFindMin, phd, ptl, withProof, assoc},
   % Typeclasses or types you want emphasized:
-  morekeywords=[4]{Ord,Eq,Show,Functor,Monad,PriorityQueue, LeftistHeap, Nat, Pos, Int, Btwn, Bool},
+  morekeywords=[4]{Ord,Eq,Show,Functor,Monad,PriorityQueue, LeftistHeap, Nat, Pos, Int, Btwn, Bool, Bag, PList},
   keywordstyle=\color{CodeKw}\bfseries,
   keywordstyle=[2]\color{LHKey}\bfseries,
   keywordstyle=[3]\color{FuncName}\bfseries,
@@ -258,6 +259,7 @@ Kaiserslautern, den \the\day.\the\month.\the\year
 % Content %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \mainmatter
+\listoftodos
 \input{content/chapter1.tex}
 \input{content/chapter2.tex}
 \input{content/chapter3.tex}

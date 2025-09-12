@@ -159,9 +159,10 @@ In the previous examples, we saw how refinements of input and output of function
 We can take this further by refining the data types.
 We use the following example as an illustration, following~\cite{jhala2020}:
 \begin{code}
-	data Slist a = Slist { size :: Int, elems :: [a] }
-
-	{-@ data Slist a = Slist { size :: Nat, elems :: {v:[a] | len v == size} } @-}
+data Slist a = Slist { 
+  size :: Nat, 
+  elems :: {v:[a] | len v == size} 
+  }
 \end{code}
 
 This refined \textit{Slist} data type ensures the stored `size` always matches the length of the `elems` list,
@@ -186,7 +187,6 @@ Consider the data type of a bag (multiset) defined as a map from elements to the
 
 Now we can define a measure \texttt{bag} that computes the bag of elements for a list:
 \begin{code}
-
 	{-@ measure bag @-}
 	{-@ bag :: Ord a => [a]-> Bag a @-}
 	bag :: (Ord a) => [a] -> Bag a
@@ -249,18 +249,18 @@ The \texttt{reflect} annotation, lift the \texttt{(++)} into the logic in three 
 	      by automatically strengthening the defined function type for \texttt{(++)} to:
 
 
-	      \begin{code}
-		      (++) :: xs:[a] -> ys:[a]
-		      -> { zs:[a] | len zs == len xs + len ys
-		      && zs = xs ++ ys
-		      && ppProp xs ys }
-	      \end{code}
+\begin{code}
+  (++) :: xs:[a] -> ys:[a]
+  -> { zs:[a] | len zs == len xs + len ys
+  && zs = xs ++ ys
+  && ppProp xs ys }
+\end{code}
 	      where \texttt{ppProp} is an alias for the following refinement, derived from the function's definition:
-	      \begin{code}
-		      ppProp xs ys = if xs == [] then ys
-		      else cons (head xs) (ppProp (tail xs) ys)
+\begin{code}
+  ppProp xs ys = if xs == [] then ys
+  else cons (head xs) (ppProp (tail xs) ys)
 
-	      \end{code}
+\end{code}
 	\item \textbf{Application}: With the reflected refinement type, each application of \texttt{(++)}
 	      in the code automatically unfolds the definition of \texttt{(++)} only \textit{once} in the logic. In the
 	      next section, we will look into \texttt{PLE} that allows to unfold the definition of the function multiple times.
@@ -270,6 +270,34 @@ as opposed to treating it only as an uninterpreted function.
 In the following subsection,
 we will show how to use \texttt{LiquidHaskell} to verify that the \texttt{(++)} function is associative.
 
+\subsection{Refinement Abstraction}
+In addition to reflection and measures, \texttt{LiquidHaskell} provides powerful abstraction mechanisms for refinement types.
+Suppose we want to define a list where elements satisfy a relation with their neighbors. We can use \texttt{Refinement Abstraction} to define a new data type that abstracts over the refinement predicate \cite{vazou_liquidhaskell_2014}:
+
+\begin{code}
+	data PList a <p :: a -> a -> Bool> =
+	Nil
+	| Cons { phd :: a, ptl :: PList <p> a <p phd> }
+\end{code}
+
+Here, the type \texttt{a<p>} is a refinement type, equivalent to \texttt{\{v:a | p\ v\}} .
+The abstraction \texttt{<p :: a -> a -> Bool>} allows us to parameterize the list by a binary predicate \texttt{p}.
+
+We can now use this abstraction to define a list of integers where each element is less than or equal to the next:
+
+\begin{code}
+	type SortedList = PList <{\x y -> x <= y}> Int
+\end{code}
+
+LiquidHaskell can verify that the following list is sorted:
+
+\begin{code}
+	{-@ ok :: SortedList @-}
+	ok :: PList Int
+	ok = Cons 1 (Cons 2 (Cons 3 Nil))
+\end{code}
+
+% The abstraction allows us to define other properties as well, such as strictly increasing lists, by changing the predicate.
 \subsection{Equational Proofs}
 \texttt{LiquidHaskell} allows formulation of proofs following the style of calculational or equational reasoning popularized in classic texts
 and implemented in proof assistants like Coq and Agda \cite{vazou2018}.
@@ -338,6 +366,8 @@ In the following example, we show how to use these combinators to verify that th
 
 As you can see, we use proof by induction and in the induction step we use recursive call in the last step.
 
+\subsection{Totality}
+\todo{[Mehran] Finish this}
 \subsection{Termination}
 One crucial aspect of LiquidHaskell is ensuring that all functions terminate.
 This is required for the soundness of the refinement type system, as non-terminating functions can lead to inconsistencies in the logic \cite{niki_lecture_2024}.
@@ -372,6 +402,9 @@ In the above code, we only need to provide the base case and induction hypothese
 \texttt{LiquidHaskell} will automatically unfold the definition of \texttt{(++)} to prove the associativity of the function.
 In the next section, we go through an example application of \texttt{LiquidHaskell}.
 \section { Strengths and Limitations }
+\todo[inline]{[Mehran] Finish Strengths and Limitations}
 Where it excels and where it struggles (e.g., termination proofs, higher-order functions).
+
 \section { Related Work }
+\todo[inline]{[Mehran] Finish related work}
 Comparison with Coq, Agda, Dafny, or other tools verifying similar structures.
