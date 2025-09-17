@@ -1,0 +1,70 @@
+\begin{figure}[h!]
+\centering
+\caption{Visualization of Leftist Heap Properties}
+\label{fig:leftist-heap}
+\begin{tikzpicture}[
+    % Style for the heap nodes (circles with values)
+    heapnode/.style={circle, draw, thick, minimum size=1cm, font=\Large},
+    % Style for the rank labels below each node
+    ranklabel/.style={below=2pt of #1, font=\small\itshape, text=black},
+    % Style for the property check labels
+    checklabel/.style={right=4pt of #1, font=\small\color{blue!80!black}},
+    % Style for standard tree edges
+    edge/.style={draw, thick},
+    % Style for the highlighted right spine
+    spine/.style={draw=red, very thick}
+]
+
+% --- NODES ---
+% Place the nodes of the tree manually for clarity
+\node[heapnode] (root) {3};
+\node[heapnode, below left=1.2cm and 1.8cm of root] (n5) {5};
+\node[heapnode, below right=1.2cm and 1.8cm of root] (n20) {20};
+\node[heapnode, below left=1.2cm and 1.2cm of n5] (n8) {8};
+\node[heapnode, below right=1.2cm and 1.2cm of n5] (n10) {10};
+\node[heapnode, below left=1.2cm and 0.5cm of n10] (n15) {15};
+% Null nodes to show the end of paths
+\node[below right=1.2cm and 0.5cm of n10] (null_n10) {$\emptyset$};
+\node[below=1.2cm of n20] (null_n20) {$\emptyset$};
+
+% --- EDGES ---
+% Draw the standard parent-child connections
+\path[edge] (root) edge (n5);
+\path[edge] (n5) edge (n8);
+\path[edge] (n5) edge (n10);
+\path[edge] (n10) edge (n15);
+\path[edge, dashed] (n10) edge (null_n10); % Dashed line to null node
+
+% --- RIGHT SPINE ---
+% Draw the right spine in red to highlight it
+\path[spine] (root) edge (n20);
+\path[spine] (n20) edge (null_n20);
+
+% --- LABELS ---
+% Add rank labels below each node
+\node[ranklabel=root] (r_root) {rank=2};
+\node[ranklabel=n5] (r_n5) {rank=2};
+\node[ranklabel=n20, below left=2pt of n20] (r_n20) {rank=1};
+\node[ranklabel=n8] (r_n8) {rank=1};
+\node[ranklabel=n10, below left=1pt of n10] (r_n10) {rank=1};
+\node[ranklabel=n15] (r_n15) {rank=1};
+\node[ranklabel=null_n10, text=gray] {rank=0};
+\node[ranklabel=null_n20, text=gray] {rank=0};
+
+% --- PROPERTY CHECKS ---
+% Add labels showing the Leftist Property check at each node
+
+% --- LEGEND ---
+% Add a small legend to explain the diagram elements
+\node[align=left, font=\small, text width=4cm, anchor=north west] 
+    at ([xshift=1cm] current bounding box.east |- root.north) (legend){
+    \textbf{Heap Property:} Parent $\le$ Child \\ (e.g., $3 \le 5$, $3 \le 20$, $5 \le 8$)
+    \vspace{0.4cm}
+    
+    \textbf{\color{blue!80!black}Leftist Property:} {\color{blue!80!black}rank(left) $\ge$ rank(right)}
+    \vspace{0.4cm}
+    
+    \textbf{\color{red}Right Spine:} Path highlighted in red. The \textit{rank} of a node is the length of its right spine. For the root, the path is $3 \to 20 \to \emptyset$, so its rank is 2.
+};
+\end{tikzpicture}
+\end{figure}

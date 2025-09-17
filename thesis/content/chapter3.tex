@@ -20,21 +20,21 @@ which returns the minimum element and the remaining heap.
 \begin{code}[caption={Leftist Heap Implementation in Haskell}, label={lst:pq}]
 
 	data MinView q a =
-	EmptyView | Min {minValue :: a, restHeap :: q a}
-	deriving (Show, Eq)
+	  EmptyView | Min {minValue :: a, restHeap :: q a}
+	  deriving (Show, Eq)
 
 	class PriorityQueue pq where
-	empty :: (Ord a) => pq a
-	isEmpty :: (Ord a) => pq a -> Bool
-	findMin :: (Ord a) => pq a -> Maybe a
-	insert :: (Ord a) => a -> pq a -> pq a
-	splitMin :: (Ord a) => pq a -> MinView pq a
+    empty :: (Ord a) => pq a
+    isEmpty :: (Ord a) => pq a -> Bool
+    findMin :: (Ord a) => pq a -> Maybe a
+    insert :: (Ord a) => a -> pq a -> pq a
+    splitMin :: (Ord a) => pq a -> MinView pq a
 \end{code}
 
 Priority queues are widely used in computer science and engineering.
-They play a central role in \emph{operating systems} for task scheduling, in \emph{graph algorithms} such as Dijkstra’s shortest path and Prim’s minimum spanning tree, and in \emph{discrete event simulation}, where events are processed in order of occurrence time.
-Other applications include data compression (e.g., Huffman coding) and networking (packet scheduling).
-\todo{Find references for these applications}
+They play a central role in \emph{operating systems} for task scheduling, in \emph{graph algorithms} such as Dijkstra’s shortest path \cite{Dijkstra59} and Prim’s minimum spanning tree \cite{Prim57}, and in \emph{discrete event simulation},
+where events are processed in order of occurrence time.
+Other applications include data compression (e.g., Huffman coding \cite{Huffman52}) and networking (packet scheduling).
 
 In this thesis, we focus on the \emph{min-priority queue}, where elements with lower keys are considered higher priority.
 We will study and verify functional implementations of \emph{Leftist Heaps} priority queues.
@@ -60,7 +60,7 @@ efficient merging. They are defined by two key invariants:
 	      possible, which in turn guarantees logarithmic time complexity for merging
 	      operations\cite{okasaki}.
 \end{itemize}
-
+\input{figures/leftistHeap.tex}
 We represent leftist heaps using a recursive algebraic data type in Haskell, as described by Okasaki~\cite{okasaki}:
 \begin{code}[caption={Leftist Heap data type}, label={lst:leftist}]
 	data LeftistHeap a

@@ -1,4 +1,4 @@
-\chapter { \texttt{LiquidHaskell} Overview }
+\chapter { LiquidHaskell Overview }
 \texttt{LiquidHaskell} is a static verification tool that extends Haskell with
 \emph{refinement types}. In essence, it augments Haskell’s type system with
 logical predicates that are automatically checked by an SMT (Satisfiability
@@ -272,9 +272,9 @@ we will show how to use \texttt{LiquidHaskell} to verify that the \texttt{(++)} 
 
 \subsection{Refinement Abstraction}
 In addition to reflection and measures, \texttt{LiquidHaskell} provides powerful abstraction mechanisms for refinement types.
-Suppose we want to define a list where elements satisfy a relation with their neighbors. We can use \texttt{Refinement Abstraction} to define a new data type that abstracts over the refinement predicate \cite{vazou_liquidhaskell_2014}:
+Suppose we want to define a list where elements satisfy a relation with their neighbors.
+We can use \texttt{Refinement Abstraction} to define a new data type that abstracts over the refinement predicate \cite{vazou_liquidhaskell_2014}:
 
-\todo[inline]{Add picture for showing the structure of the list}
 \begin{code}
 	data PList a <p :: a -> a -> Bool> =
 	Nil
@@ -298,6 +298,7 @@ LiquidHaskell can verify that the following list is sorted:
 	ok = Cons 1 (Cons 2 (Cons 3 Nil))
 \end{code}
 
+\input{figures/plist.tex}
 % The abstraction allows us to define other properties as well, such as strictly increasing lists, by changing the predicate.
 \subsection{Equational Proofs}
 \texttt{LiquidHaskell} allows formulation of proofs following the style of calculational or equational reasoning popularized in classic texts
@@ -348,7 +349,7 @@ With type \texttt{x:a -> b -> \{v:a | v = x\}}, it asserts that the returned val
 In the following example, we show how to use these combinators to verify that the \texttt{(++)} function is associative:
 
 
-\begin{code}[ label=lst:associative]
+\begin{code}[label=lst:associative]
 	{-@ assoc :: xs:[a] -> ys:[a] -> zs:[a]
 	-> { (xs ++ ys) ++ zs = xs ++ (ys ++ zs) } @-}
 	assoc :: [a] -> [a] -> [a] -> ()
