@@ -15,8 +15,8 @@ build-type:     Simple
 library
   exposed-modules:
       PriorityQueue.LeftistHeap
-      PriorityQueue.Example
-      PriorityQueue.BionomialHeap
+      Example
+      -- PriorityQueue.BionomialHeap
       PriorityQueue.Base
 
   hs-source-dirs:
@@ -36,8 +36,18 @@ test-suite priority-queue
   hs-source-dirs: test
   main-is: Main.hs
   build-depends:
+    liquid-prelude,
+    liquid-vector,
+    liquidhaskell,
     base,
     pq-verification,
     tasty,
     tasty-hunit
+  other-modules:
+    PriorityQueue.LeftistHeapTests
+    ExampleTests
+
   default-language: Haskell2010
+
+  ghc-options:  -fplugin=LiquidHaskell 
+ 
