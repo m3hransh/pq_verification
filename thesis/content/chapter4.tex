@@ -159,10 +159,10 @@ In the previous examples, we saw how refinements of input and output of function
 We can take this further by refining the data types.
 We use the following example as an illustration, following~\cite{jhala2020}:
 \begin{code}
-data Slist a = Slist { 
-  size :: Nat, 
-  elems :: {v:[a] | len v == size} 
-  }
+	data Slist a = Slist {
+	size :: Nat,
+	elems :: {v:[a] | len v == size}
+	}
 \end{code}
 
 This refined \textit{Slist} data type ensures the stored `size` always matches the length of the `elems` list,
@@ -369,22 +369,146 @@ In the following example, we show how to use these combinators to verify that th
 As you can see, we use proof by induction and in the induction step we use recursive call in the last step.
 
 \subsection{Totality}
-\todo{[Mehran] Finish this}
+Ensuring \emph{total} functions—functions defined for all possible inputs—is essential in program verification.
+In Haskell, however, many heap operations are naturally partial.
+Consider the definition of \texttt{findMin} for leftist heaps:
+
+\begin{code}
+  findMin :: Heap a -> a
+  findMin (Node x _ _) = x
+\end{code}
+
+This works for non-empty heaps but fails on \texttt{Empty}, resulting in a runtime exception.
+In GHC’s Core, the missing case is made explicit through a call to \texttt{patError}:
+
+\begin{code}
+  findMin d = case d of
+  Node x _ _ -> x
+  Empty -> patError "findMin"
+\end{code}
+
+Here, \texttt{patError} is technically total, but it has an uninhabited type:
+
+\begin{code}
+  patError :: {v:String | false} -> a
+\end{code}
+
+\texttt{LiquidHaskell} eliminates such dead code by requiring refinements that ensure \texttt{findMin} is only applied to non-empty heaps.
+This can be achieved by defining a measure and a corresponding predicate:
+
+\begin{code}
+  measure isNonEmpty :: Heap a -> Prop
+  isNonEmpty (Node _ _ _) = true
+  isNonEmpty Empty = false
+
+  predicate NonEmp H = isNonEmpty H
+\end{code}
+
+Using this predicate, we refine the type of \texttt{findMin}:
+
+\begin{code}
+  findMin :: {h:Heap a | NonEmp h} -> a
+\end{code}
+
+Now \texttt{LiquidHaskell} verifies that the \texttt{Empty} branch is unreachable.
+When pattern matching on \texttt{d = Empty}, the environment is refined to:
+
+\begin{code}
+  Empty :: {v:Heap a | NonEmp v && v = Empty}
+\end{code}
+
+This condition is contradictory: \texttt{v = Empty} implies the heap is empty, while \texttt{NonEmp v} requires it to be non-empty.
+Since no such value exists, \texttt{LiquidHaskell} concludes that the call to \texttt{patError} is infeasible.
+Thus, \texttt{findMin} is total under its precondition.
+The burden shifts to clients: they must prove statically that any heap passed to \texttt{findMin} is non-empty.
+
+The same reasoning applies to \texttt{deleteMin}, which is unsafe on empty heaps.
+By refining its type, we likewise guarantee totality:
+
+\begin{code}
+  deleteMin :: {h:Heap a | NonEmp h} -> Heap a
+\end{code}
+
 \subsection{Termination}
-One crucial aspect of LiquidHaskell is ensuring that all functions terminate.
-This is required for the soundness of the refinement type system, as non-terminating functions can lead to inconsistencies in the logic \cite{niki_lecture_2024}.
-To ensure this, it employs three mechanisms :
-\begin{enumerate}
-	\item \textit{Structural Termination}:This is a first method that \texttt{LiquidHaskell} will look to verify that recursive calls in functions operating on data types are made with a smaller part of the input.
-	      If this verification fails, either due to the function not being defined on a data type or the recursive calls not being on a subpart, then \texttt{LiquidHaskell} offers two following alternative methods to ensure termination.
-	\item \textit{Terrmination Heuristic}: The first argument that can be "sized"-- there is measure function that turned into \texttt{Nat}--
-	      should be decreasing and non negative in recursive calls.
+Another crucial aspect of \texttt{LiquidHaskell} is termination checking.
+Ensuring that all functions terminate is necessary for the soundness of the refinement type system, since non-termination can undermine logical consistency \cite{niki_lecture_2024}.
+\texttt{LiquidHaskell} enforces this by associating a well-founded termination metric with a function’s parameters and proving—via refinement checking—that the metric decreases with each recursive call \cite{vazou_liquidhaskell_2014}.
 
-	\item \textit{Termination Metrics}: user provide, integer expressions tha can depend on the function arguments and are used to check termination.
-\end{enumerate}
-In code \ref{lst:associative}, the \texttt{assoc} function is terminating because the recursive call is made on the tail of the list, which is a subpart of the input list.
+For example, consider the factorial function:
 
-\todo[inline]{Expand on this section with examples}
+\begin{code}
+  fac :: n:Nat -> Nat / [n]
+\end{code}
+
+The termination metric \texttt{[n]} specifies that \texttt{n} must decrease in each recursive call.
+
+Metrics need not be limited to single arguments.
+For instance, the \texttt{range} function uses an expression as the metric:
+
+\begin{code}
+  {-@ range :: lo:Int -> hi:Int -> [Int] / [hi - lo] @-}
+  range :: Int -> Int -> [Int]
+  range lo hi
+  | lo < hi = lo : range (lo + 1) hi
+  | otherwise = []
+\end{code}
+
+Although neither \texttt{lo} nor \texttt{hi} decreases alone, their difference \texttt{hi - lo} does.
+
+Some functions require more general metrics.
+When multiple arguments may decrease, lexicographic ordering is used.
+Consider the greatest common divisor (GCD):
+
+\begin{code}
+  gcd :: Int -> Int -> Int
+  gcd 0 b = 0
+  gcd a 0 = a
+  gcd a b | a == b = a
+  | a > b = gcd (a - b) b
+  | a < b = gcd a (b - a)
+\end{code}
+
+Its refined type uses lexicographic ordering:
+
+\begin{code}
+  gcd :: a:Nat -> b:Nat -> Nat / [a, b]
+\end{code}
+
+The same technique applies to mutually recursive functions such as \texttt{isEven} and \texttt{isOdd} \cite{vazou_liquidhaskell_2014}:
+
+\begin{code}
+isEven 0 = True
+isEven n = isOdd (n - 1)
+
+isOdd n = not (isEven n)
+\end{code}
+
+Here, \texttt{isEven} decreases on its argument, while \texttt{isOdd} does not.
+By specifying metrics as:
+
+\begin{code}
+isEven :: n:Nat -> Bool / [n, 0]
+isOdd :: n:Nat -> Bool / [n, 1]
+\end{code}
+
+\texttt{LiquidHaskell} checks that each recursive call reduces the lexicographic metric: e.g., \texttt{[n, 0]} is greater than \texttt{[n-1, 1]} in the call from \texttt{isEven} to \texttt{isOdd}.
+
+Termination checking also extends to finite data structures by using their size.
+For example, the \texttt{bag} function can be checked using list length:
+
+\begin{code}
+bag :: Ord a => xs:[a] -> Bag a / [len xs]
+\end{code}
+
+In practice, \texttt{LiquidHaskell} assumes by default that the first argument with a size measure (e.g., \texttt{len} for lists) decreases \cite{vazou_liquidhaskell_2014}.
+
+In some cases, Haskell functions are deliberately non-terminating.
+For such functions, termination checking can be disabled locally with the \texttt{lazy} annotation, or globally with the directive:
+
+\begin{code}
+{-@ LIQUID "--no-termination" @-}
+\end{code}
+
 \subsection{Proof by Logical Evaluation}
 In our proof in code \ref{lst:associative}, for the most parts we used trivial unfolding of \texttt{(++)} function definition.
 However, \texttt{LiquidHaskell} offer a tactic called \texttt{Proof by Logical Evaluation} (PLE)
@@ -403,11 +527,4 @@ We can activate PLE by adding \texttt{\{-@ LIQUID "---ple" @-\}} annotation to a
 
 In the above code, we only need to provide the base case and induction hypotheses, and
 \texttt{LiquidHaskell} will automatically unfold the definition of \texttt{(++)} to prove the associativity of the function.
-In the next section, we go through an example application of \texttt{LiquidHaskell}.
-\section { Strengths and Limitations }
-\todo[inline]{[Mehran] Finish Strengths and Limitations}
-Where it excels and where it struggles (e.g., termination proofs, higher-order functions).
-
-\section { Related Work }
-\todo[inline]{[Mehran] Finish related work}
-Comparison with Coq, Agda, Dafny, or other tools verifying similar structures.
+In the following chapter, we learn how to use \texttt{LiquidHaskell} to verify properties of functional data structures.
