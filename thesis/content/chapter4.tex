@@ -374,47 +374,47 @@ In Haskell, however, many heap operations are naturally partial.
 Consider the definition of \texttt{findMin} for leftist heaps:
 
 \begin{code}
-  findMin :: Heap a -> a
-  findMin (Node x _ _) = x
+	findMin :: Heap a -> a
+	findMin (Node x _ _) = x
 \end{code}
 
 This works for non-empty heaps but fails on \texttt{Empty}, resulting in a runtime exception.
 In GHC’s Core, the missing case is made explicit through a call to \texttt{patError}:
 
 \begin{code}
-  findMin d = case d of
-  Node x _ _ -> x
-  Empty -> patError "findMin"
+	findMin d = case d of
+	Node x _ _ -> x
+	Empty -> patError "findMin"
 \end{code}
 
 Here, \texttt{patError} is technically total, but it has an uninhabited type:
 
 \begin{code}
-  patError :: {v:String | false} -> a
+	patError :: {v:String | false} -> a
 \end{code}
 
 \texttt{LiquidHaskell} eliminates such dead code by requiring refinements that ensure \texttt{findMin} is only applied to non-empty heaps.
 This can be achieved by defining a measure and a corresponding predicate:
 
 \begin{code}
-  measure isNonEmpty :: Heap a -> Prop
-  isNonEmpty (Node _ _ _) = true
-  isNonEmpty Empty = false
+	measure isNonEmpty :: Heap a -> Prop
+	isNonEmpty (Node _ _ _) = true
+	isNonEmpty Empty = false
 
-  predicate NonEmp H = isNonEmpty H
+	predicate NonEmp H = isNonEmpty H
 \end{code}
 
 Using this predicate, we refine the type of \texttt{findMin}:
 
 \begin{code}
-  findMin :: {h:Heap a | NonEmp h} -> a
+	findMin :: {h:Heap a | NonEmp h} -> a
 \end{code}
 
 Now \texttt{LiquidHaskell} verifies that the \texttt{Empty} branch is unreachable.
 When pattern matching on \texttt{d = Empty}, the environment is refined to:
 
 \begin{code}
-  Empty :: {v:Heap a | NonEmp v && v = Empty}
+	Empty :: {v:Heap a | NonEmp v && v = Empty}
 \end{code}
 
 This condition is contradictory: \texttt{v = Empty} implies the heap is empty, while \texttt{NonEmp v} requires it to be non-empty.
@@ -426,7 +426,7 @@ The same reasoning applies to \texttt{deleteMin}, which is unsafe on empty heaps
 By refining its type, we likewise guarantee totality:
 
 \begin{code}
-  deleteMin :: {h:Heap a | NonEmp h} -> Heap a
+	deleteMin :: {h:Heap a | NonEmp h} -> Heap a
 \end{code}
 
 \subsection{Termination}
@@ -437,7 +437,7 @@ Ensuring that all functions terminate is necessary for the soundness of the refi
 For example, consider the factorial function:
 
 \begin{code}
-  fac :: n:Nat -> Nat / [n]
+	fac :: n:Nat -> Nat / [n]
 \end{code}
 
 The termination metric \texttt{[n]} specifies that \texttt{n} must decrease in each recursive call.
@@ -446,11 +446,11 @@ Metrics need not be limited to single arguments.
 For instance, the \texttt{range} function uses an expression as the metric:
 
 \begin{code}
-  {-@ range :: lo:Int -> hi:Int -> [Int] / [hi - lo] @-}
-  range :: Int -> Int -> [Int]
-  range lo hi
-  | lo < hi = lo : range (lo + 1) hi
-  | otherwise = []
+	{-@ range :: lo:Int -> hi:Int -> [Int] / [hi - lo] @-}
+	range :: Int -> Int -> [Int]
+	range lo hi
+	| lo < hi = lo : range (lo + 1) hi
+	| otherwise = []
 \end{code}
 
 Although neither \texttt{lo} nor \texttt{hi} decreases alone, their difference \texttt{hi - lo} does.
@@ -460,35 +460,35 @@ When multiple arguments may decrease, lexicographic ordering is used.
 Consider the greatest common divisor (GCD):
 
 \begin{code}
-  gcd :: Int -> Int -> Int
-  gcd 0 b = 0
-  gcd a 0 = a
-  gcd a b | a == b = a
-  | a > b = gcd (a - b) b
-  | a < b = gcd a (b - a)
+	gcd :: Int -> Int -> Int
+	gcd 0 b = 0
+	gcd a 0 = a
+	gcd a b | a == b = a
+	| a > b = gcd (a - b) b
+	| a < b = gcd a (b - a)
 \end{code}
 
 Its refined type uses lexicographic ordering:
 
 \begin{code}
-  gcd :: a:Nat -> b:Nat -> Nat / [a, b]
+	gcd :: a:Nat -> b:Nat -> Nat / [a, b]
 \end{code}
 
 The same technique applies to mutually recursive functions such as \texttt{isEven} and \texttt{isOdd} \cite{vazou_liquidhaskell_2014}:
 
 \begin{code}
-isEven 0 = True
-isEven n = isOdd (n - 1)
+	isEven 0 = True
+	isEven n = isOdd (n - 1)
 
-isOdd n = not (isEven n)
+	isOdd n = not (isEven n)
 \end{code}
 
 Here, \texttt{isEven} decreases on its argument, while \texttt{isOdd} does not.
 By specifying metrics as:
 
 \begin{code}
-isEven :: n:Nat -> Bool / [n, 0]
-isOdd :: n:Nat -> Bool / [n, 1]
+	isEven :: n:Nat -> Bool / [n, 0]
+	isOdd :: n:Nat -> Bool / [n, 1]
 \end{code}
 
 \texttt{LiquidHaskell} checks that each recursive call reduces the lexicographic metric: e.g., \texttt{[n, 0]} is greater than \texttt{[n-1, 1]} in the call from \texttt{isEven} to \texttt{isOdd}.
@@ -497,7 +497,7 @@ Termination checking also extends to finite data structures by using their size.
 For example, the \texttt{bag} function can be checked using list length:
 
 \begin{code}
-bag :: Ord a => xs:[a] -> Bag a / [len xs]
+	bag :: Ord a => xs:[a] -> Bag a / [len xs]
 \end{code}
 
 In practice, \texttt{LiquidHaskell} assumes by default that the first argument with a size measure (e.g., \texttt{len} for lists) decreases \cite{vazou_liquidhaskell_2014}.
@@ -506,14 +506,14 @@ In some cases, Haskell functions are deliberately non-terminating.
 For such functions, termination checking can be disabled locally with the \texttt{lazy} annotation, or globally with the directive:
 
 \begin{code}
-{-@ LIQUID "--no-termination" @-}
+	{-@ LIQUID "--no-termination" @-}
 \end{code}
 
 \subsection{Proof by Logical Evaluation}
-In our proof in code \ref{lst:associative}, for the most parts we used trivial unfolding of \texttt{(++)} function definition.
-However, \texttt{LiquidHaskell} offer a tactic called \texttt{Proof by Logical Evaluation} (PLE)
-that provides two key features \cite{vazou2018}. First, it is guaranteed to find an equational proof if one can be constructed
-from unfoldings of function definitions (The user must still provide lemmas and induction hypotheses) \cite{vazou2018}.
+In our proof in code \ref{lst:associative}, we primarily relied on straightforward unfoldings of the \texttt{(++)} function definition.
+However, \texttt{LiquidHaskell} provides a directive known as \texttt{Proof by Logical Evaluation} (PLE), which offers two significant advantages \cite{vazou2018}.
+First, PLE is guaranteed to construct an equational proof whenever one can be derived solely from unfoldings of function definitions, provided the user supplies necessary lemmas and induction hypotheses \cite{vazou2018}.
+Second, under practical conditions that are commonly satisfied, PLE is guaranteed to terminate \cite{vazou2018}.
 We can activate PLE by adding \texttt{\{-@ LIQUID "---ple" @-\}} annotation to automate the most parts of the proof for associativity of \texttt{(++)}:
 
 \begin{code}
