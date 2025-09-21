@@ -430,6 +430,7 @@ By refining its type, we likewise guarantee totality:
 \end{code}
 
 \subsection{Termination}
+\label{sec:termination}
 Another crucial aspect of \texttt{LiquidHaskell} is termination checking.
 Ensuring that all functions terminate is necessary for the soundness of the refinement type system, since non-termination can undermine logical consistency \cite{niki_lecture_2024}.
 \texttt{LiquidHaskell} enforces this by associating a well-founded termination metric with a function’s parameters and proving—via refinement checking—that the metric decreases with each recursive call \cite{vazou_liquidhaskell_2014}.

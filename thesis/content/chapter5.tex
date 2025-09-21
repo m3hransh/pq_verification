@@ -1,24 +1,27 @@
-\chapter{Verification in Liquid Haskell}
+\chapter{Verification in LiquidHaskell}
 \label{ch:verification}
-This chapter details the formal verification of the leftist heap implementation using Liquid Haskell. We demonstrate how refinement types can be used to enforce complex structural and behavioral invariants, ensuring the correctness of our priority queue implementation.
+This chapter details the formal verification of the leftist heap implementation using \texttt{LiquidHaskell}. We demonstrate how refinement types can be used to enforce complex structural and behavioral invariants, ensuring the correctness of our priority queue implementation.
 
 \section{Encoding Invariants}
-The cornerstone of the verification is the refined data type for the leftist heap itself. We encode the core invariants of the data structure directly into its type definition.
+The cornerstone of the verification is the refined data type for the leftist heap itself.
+We encode the core invariants of the data structure directly into its type definition.
 
 \begin{code}
   data LeftistHeap a = EmptyHeap
         | HeapNode { value :: a
-                   , left  :: {h : LeftistHeap a | isLowerBound value h}
-                   , right :: {v : LeftistHeap a  | isLowerBound value v
-                              && rrank v <= rrank left }
-                   , rank :: {r : Nat | r == 1 + rrank right}
+           , left  :: LeftistHeapBound a value
+           , right :: {v : LeftistHeapBound a value  | rrank v <= rrank left }
+           , rank :: {r : Nat | r == 1 + rrank right}
           }
 \end{code}
 
 This refined definition enforces three key invariants:
 \begin{enumerate}
-    \item \textbf{Heap Property:} The value at any node is the minimum in its subtree. This is captured by the \texttt{isLowerBound value h} refinement on the \texttt{left} and \texttt{right} children. \texttt{isLowerBound} is a recursively defined predicate that checks if a given value is less than or equal to all elements in a heap.
+    \item \textbf{Heap Property:} The value at any node is the minimum in its subtree.
+    This is captured by the \texttt{LeftistHeapBound a X} refinement type on the \texttt{left} and \texttt{right} children.
+    \texttt{isLowerBound} is a recursively defined predicate that checks if a given value is less than or equal to all elements in a heap.
     \begin{code}
+  {-@ type LeftistHeapBound a X = { h : LeftistHeap a | isLowerBound X h} @-}
   {-@ reflect isLowerBound @-} 
   isLowerBound :: (Ord a) => a -> LeftistHeap a -> Bool
   isLowerBound _ EmptyHeap = True
@@ -31,19 +34,20 @@ This refined definition enforces three key invariants:
     \item \textbf{Rank Property:} The rank of a node is defined as one plus the rank of its right child. This is specified by \texttt{rank :: \{r : Nat | r == 1 + rrank right\}}. The rank of an \texttt{EmptyHeap} is 0.
 \end{enumerate}
 
-By embedding these invariants directly into the type, Liquid Haskell's verifier will ensure that any function constructing or modifying a \texttt{LeftistHeap} respects them.
+By embedding these invariants directly into the type, \texttt{LiquidHaskell}'s verifier will ensure that any function constructing or modifying a \texttt{LeftistHeap} respects them.
 
 \section{Use of Measures and Predicates}
-To express these invariants and reason about the behavior of our functions, we use several features of Liquid Haskell.
+To express these invariants and reason about the behavior of our functions, we use several features of \texttt{LiquidHaskell}.
 
-\textbf{Measures} are functions from Haskell's term-level to the refinement logic's domain. We define several measures:
+\textbf{Measures} (see Section~\ref{sec:reflection}) are functions from Haskell's term-level to the refinement logic's domain. We define several measures:
 \begin{itemize}
-	\item \texttt{size}: Computes the total number of nodes in the heap.
+	\item \texttt{size}: Computes the total number of nodes in the heap, useful for termination metrics (see Section~\ref{sec:termination}).
 	\item \texttt{rrank}: Returns the rank of a heap, which is crucial for the leftist property.
 	\item \texttt{bag}: Converts the heap into a multiset (or bag) of its elements. This is invaluable for proving that operations like \texttt{heapMerge} do not lose or duplicate elements.
 \end{itemize}
 
-\textbf{Reflected Functions} allow us to use standard Haskell functions within the refinement logic. We use this for \texttt{isLowerBound}, \texttt{heapMerge}, and \texttt{makeHeapNode}. This allows us to reason about their behavior during verification.
+\textbf{Reflected Functions} (see Section~\ref{sec:reflection}) allow us to use standard Haskell functions within the refinement logic. We use this for \texttt{isLowerBound}, \texttt{heapMerge}, and \texttt{makeHeapNode}.
+This allows us to reason about their behavior during verification.
 
 \textbf{Predicates} are aliases for refinement types that improve readability. For instance, we define predicates to describe the post-conditions of the \texttt{heapMerge} function:
 \begin{code}
@@ -68,7 +72,7 @@ The type signature for \texttt{heapMerge} specifies its behavior:
 \end{code}
 This signature guarantees that merging two valid leftist heaps results in a new valid leftist heap, that the heap property is maintained, and that the set of elements is preserved.
 
-The implementation of \texttt{heapMerge} involves a recursive call. To help the SMT solver prove that the invariants hold through this recursion, we provide helper lemmas. For example, in the case where \texttt{x1 <= x2}, we merge the right child of the first heap (\texttt{r1}) with the second heap (\texttt{h2}). We must prove to Liquid Haskell that the root value \texttt{x1} is a lower bound for this newly merged heap.
+The implementation of \texttt{heapMerge} involves a recursive call. To help the SMT solver prove that the invariants hold through this recursion, we provide helper lemmas. For example, in the case where \texttt{x1 <= x2}, we merge the right child of the first heap (\texttt{r1}) with the second heap (\texttt{h2}). We must prove to \texttt{LiquidHaskell} that the root value \texttt{x1} is a lower bound for this newly merged heap.
 \begin{code}
 ... makeHeapNode x1 l1 ((heapMerge r1 h2) 
     `withProof` lemma_merge_case1 x1 x2 r1 h2)
@@ -92,15 +96,15 @@ With \texttt{heapMerge} verified, the correctness of other operations follows mo
 The properties proven for \texttt{heapMerge} are thus inherited by these functions.
 
 \section{Dealing with Termination and Recursion}
-Liquid Haskell must ensure that all recursive functions terminate. For \texttt{heapMerge}, we provide a termination metric:
+\texttt{LiquidHaskell} must ensure that all recursive functions terminate. For \texttt{heapMerge}, we provide a termination metric:
 \begin{verbatim}
 / [size h1, size h2, 0]
 \end{verbatim}
 \todo[inline]{Explain the metric why 0 is used}
-This specifies a lexicographically ordered tuple. Liquid Haskell verifies that for every recursive call within \texttt{heapMerge}, this metric decreases. In our case, one of the heaps is replaced by its right child, which is strictly smaller, thus decreasing the total size and ensuring termination. The lemmas also have termination metrics that are checked by the verifier.
+This specifies a lexicographically ordered tuple. \texttt{LiquidHaskell} verifies that for every recursive call within \texttt{heapMerge}, this metric decreases. In our case, one of the heaps is replaced by its right child, which is strictly smaller, thus decreasing the total size and ensuring termination. The lemmas also have termination metrics that are checked by the verifier.
 
 \section{Challenges and Workarounds}
 The primary challenge in verifying the leftist heap was proving that the structural invariants are preserved by the recursive \texttt{heapMerge} function. The SMT solver, while powerful, cannot always deduce these properties on its own, especially when they rely on inductive reasoning over a recursive data structure.
 
-The main "workaround" was to guide the solver by providing explicit proofs in the form of lemmas (\texttt{lemma\_merge\_case1} and \texttt{lemma\_heapMerge\_case2}). These lemmas essentially break down the proof of correctness into smaller, more manageable steps that the solver can verify. They act as explicit induction steps. For example, \texttt{lemma\_merge\_case1} proves a key property about the recursive call, which Liquid Haskell can then use to prove the property for the function as a whole. This pattern of using helper lemmas to discharge proof obligations is common in formal verification with refinement types.
+The main "workaround" was to guide the solver by providing explicit proofs in the form of lemmas (\texttt{lemma\_merge\_case1} and \texttt{lemma\_heapMerge\_case2}). These lemmas essentially break down the proof of correctness into smaller, more manageable steps that the solver can verify. They act as explicit induction steps. For example, \texttt{lemma\_merge\_case1} proves a key property about the recursive call, which \texttt{LiquidHaskell} can then use to prove the property for the function as a whole. This pattern of using helper lemmas to discharge proof obligations is common in formal verification with refinement types.
 
