@@ -80,10 +80,9 @@ The implementation of \texttt{heapMerge} involves a recursive call. To help the 
 The lemma \texttt{lemma\_merge\_case1} provides this proof.
 \begin{code}
   lemma_merge_case1 :: x1 : a  
-        -> x2 : { v : a |  x1  <= v}
-        -> r1 : {h : LeftistHeap a | isLowerBound x1 h} 
-        -> h2 : {h : LeftistHeap a | not (heapIsEmpty h) 
-                                  && isLowerBound x2 h}  
+        -> x2 : {v : a |  x1  <= v}
+        -> r1 : LeftistHeapBound a x1 
+        -> h2 : {h : LeftistHeapBound a x3 | not (heapIsEmpty h) }  
         -> {isLowerBound x1 (heapMerge r1 h2)}
 \end{code}
 This lemma states that if \texttt{x1} is a lower bound for \texttt{r1} and \texttt{x1 <= x2} where \texttt{x2} is a lower bound for \texttt{h2}, then \texttt{x1} must also be a lower bound for the result of merging \texttt{r1} and \texttt{h2}.
@@ -96,13 +95,33 @@ With \texttt{heapMerge} verified, the correctness of other operations follows mo
 The properties proven for \texttt{heapMerge} are thus inherited by these functions.
 
 \section{Dealing with Termination and Recursion}
-\texttt{LiquidHaskell} must ensure that all recursive functions terminate. For \texttt{heapMerge}, we provide a termination metric:
-\begin{verbatim}
-/ [size h1, size h2, 0]
-\end{verbatim}
-\todo[inline]{Explain the metric why 0 is used}
-This specifies a lexicographically ordered tuple. \texttt{LiquidHaskell} verifies that for every recursive call within \texttt{heapMerge}, this metric decreases. In our case, one of the heaps is replaced by its right child, which is strictly smaller, thus decreasing the total size and ensuring termination. The lemmas also have termination metrics that are checked by the verifier.
 
+\texttt{LiquidHaskell} must ensure that all recursive functions terminate. 
+For \texttt{heapMerge}, we provide the following termination metric:
+
+\begin{code}
+/ [size h1, size h2, 0]
+\end{code}
+
+This specifies a lexicographically ordered tuple. 
+\texttt{LiquidHaskell} verifies that for every recursive call within \texttt{heapMerge}, either the size of the first argument or the size of the second argument decreases. 
+In our case, one of the heaps is replaced by its right child, which is strictly smaller, thereby decreasing the total size and ensuring termination. 
+The trailing \texttt{0} acts as a tie-breaker: it allows us to extend the tuple later when reasoning about mutually recursive functions.
+
+The lemma \texttt{lemma\_merge\_case1} is mutually recursive with \texttt{heapMerge}, which requires us to make explicit which arguments of \texttt{heapMerge} are reduced in the body of the function (for instance, \texttt{r1} compared to \texttt{h1}). 
+To capture this, we use the following termination metric for \texttt{lemma\_merge\_case1}:
+
+\begin{code}
+/ [size r1, size h2, 1]
+\end{code}
+
+Here the final \texttt{1} ensures that 
+\[
+[size\ r1, size\ h2, 0] \;<\; [size\ h1, size\ h2, 1]
+\]
+in lexicographic order. 
+This helps the verifier see that the mutual recursion between \texttt{heapMerge} and \texttt{lemma\_merge\_case1} is terminating.
+In the same way, other supporting lemmas are also assigned termination metrics, which are automatically checked by the verifier.
 \section{Challenges and Workarounds}
 The primary challenge in verifying the leftist heap was proving that the structural invariants are preserved by the recursive \texttt{heapMerge} function. The SMT solver, while powerful, cannot always deduce these properties on its own, especially when they rely on inductive reasoning over a recursive data structure.
 

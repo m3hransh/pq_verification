@@ -6,10 +6,10 @@ Modulo Theories) solver \cite{vazou2014}. This combination makes it possible
 to verify properties of Haskell programs in a lightweight and automated way.
 
 \texttt{LiquidHaskell} is implemented as a GHC plugin and works directly on standard
-Haskell code. Programmers can enrich type signatures with logical refinements,
+Haskell code \cite{LH2020}. Programmers can enrich type signatures with logical refinements,
 such as bounds on integers, shape properties of data structures, or functional
 invariants. During compilation, \texttt{LiquidHaskell} generates \emph{subtyping
-	queries} from these annotations and delegates them to an SMT solver. If the
+	queries} from these annotations and delegates them to an SMT solver \cite{vazou_liquidhaskell_2014}. If the
 queries are valid, the program is accepted as verified; otherwise, Liquid
 Haskell produces verification errors.
 
@@ -141,9 +141,9 @@ queries into VCs \cite{vazou2014}.
 	\caption{Notation: Translation to VCs \cite{vazou2014}}
 	\label{fig:notation}
 \end{figure}
-\subsection{Function Contracts}
+\section{Function Contracts}
 Refinements can also be used to specify function contracts, i.e., pre- and
-postconditions. For lookup, we can require that the index is non-negative and
+postconditions. For \texttt{lookup}, we can require that the index is non-negative and
 less than the length of the list:
 
 \begin{code}
@@ -154,7 +154,7 @@ The type of second argument states that the list \texttt{xs} must have length gr
 \texttt{len} is a function defined by \texttt{LiquidHaskell} in the refinement logic that returns the length of the list.
 In Section \ref{sec:reflection}, we will show how to define and use user-defined functions in the refinement logic.
 
-\subsection{Refined Data Types}
+\section{Refined Data Types}
 In the previous examples, we saw how refinements of input and output of function allow us to have stronger arguments about our program.
 We can take this further by refining the data types.
 We use the following example as an illustration, following~\cite{jhala2020}:
@@ -171,7 +171,7 @@ This ensures that the size of the list is always correct.
 
 In the following section, we show how can we use reflection or measure directives to reason about user-defined Haskell function in the refinement logic.
 
-\subsection{Lifting Functions to the Refinement Logic}
+\section{Lifting Functions to the Refinement Logic}
 \label{sec:reflection}
 When our programs become more complex, we need to define our own functions in the refinement logic and reason about
 a function within another function. Refinement Reflection allows deep specification and verification by
@@ -270,7 +270,7 @@ as opposed to treating it only as an uninterpreted function.
 In the following subsection,
 we will show how to use \texttt{LiquidHaskell} to verify that the \texttt{(++)} function is associative.
 
-\subsection{Refinement Abstraction}
+\section{Refinement Abstraction}
 In addition to reflection and measures, \texttt{LiquidHaskell} provides powerful abstraction mechanisms for refinement types.
 Suppose we want to define a list where elements satisfy a relation with their neighbors.
 We can use \texttt{Refinement Abstraction} to define a new data type that abstracts over the refinement predicate \cite{vazou_liquidhaskell_2014}:
@@ -300,7 +300,7 @@ LiquidHaskell can verify that the following list is sorted:
 
 \input{figures/plist.tex}
 % The abstraction allows us to define other properties as well, such as strictly increasing lists, by changing the predicate.
-\subsection{Equational Proofs}
+\section{Equational Proofs}
 \texttt{LiquidHaskell} allows formulation of proofs following the style of calculational or equational reasoning popularized in classic texts
 and implemented in proof assistants like Coq and Agda \cite{vazou2018}.
 It comes with the proof combinators library that allows to make the proofs more readable.
@@ -368,7 +368,7 @@ In the following example, we show how to use these combinators to verify that th
 
 As you can see, we use proof by induction and in the induction step we use recursive call in the last step.
 
-\subsection{Totality}
+\section{Totality}
 Ensuring \emph{total} functions—functions defined for all possible inputs—is essential in program verification.
 In Haskell, however, many heap operations are naturally partial.
 Consider the definition of \texttt{findMin} for leftist heaps:
@@ -429,7 +429,7 @@ By refining its type, we likewise guarantee totality:
 	deleteMin :: {h:Heap a | NonEmp h} -> Heap a
 \end{code}
 
-\subsection{Termination}
+\section{Termination}
 \label{sec:termination}
 Another crucial aspect of \texttt{LiquidHaskell} is termination checking.
 Ensuring that all functions terminate is necessary for the soundness of the refinement type system, since non-termination can undermine logical consistency \cite{niki_lecture_2024}.
@@ -493,6 +493,7 @@ By specifying metrics as:
 \end{code}
 
 \texttt{LiquidHaskell} checks that each recursive call reduces the lexicographic metric: e.g., \texttt{[n, 0]} is greater than \texttt{[n-1, 1]} in the call from \texttt{isEven} to \texttt{isOdd}.
+Similarly, \texttt{[n, 1]} is greater than \texttt{[n, 0]} in the call from \texttt{isOdd} to \texttt{isEven}.
 
 Termination checking also extends to finite data structures by using their size.
 For example, the \texttt{bag} function can be checked using list length:
@@ -510,7 +511,7 @@ For such functions, termination checking can be disabled locally with the \textt
 	{-@ LIQUID "--no-termination" @-}
 \end{code}
 
-\subsection{Proof by Logical Evaluation}
+\section{Proof by Logical Evaluation}
 In our proof in code \ref{lst:associative}, we primarily relied on straightforward unfoldings of the \texttt{(++)} function definition.
 However, \texttt{LiquidHaskell} provides a directive known as \texttt{Proof by Logical Evaluation} (PLE), which offers two significant advantages \cite{vazou2018}.
 First, PLE is guaranteed to construct an equational proof whenever one can be derived solely from unfoldings of function definitions, provided the user supplies necessary lemmas and induction hypotheses \cite{vazou2018}.
