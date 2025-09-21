@@ -1,39 +1,41 @@
-
 \chapter{Background and Related Work}
 \label{chap:background}
 
-This chapter provides the necessary background for understanding the contributions of this thesis. We begin by introducing functional data structures, focusing on the principles of immutability and persistence that make them amenable to formal verification. We then survey program verification techniques, from foundational concepts like Hoare logic to modern automated methods based on refinement types and SMT solvers. Finally, we present a detailed comparison of related work, evaluating how other verification frameworks like Coq, Agda, and Dafny have been used to verify the correctness of similar data structures.
+This chapter provides the necessary background for understanding the contributions of this thesis.
+We begin by introducing functional data structures, focusing on the principles of immutability and persistence that make them amenable to formal verification.
+We then survey program verification techniques, from foundational concepts like Hoare logic to modern automated methods based on refinement types and SMT solvers.
+Finally, we present a detailed comparison of related work, evaluating how other verification frameworks such as Coq, Agda, and Dafny have been used to verify the correctness of similar data structures.
 
 \section{Functional Data Structures}
 
-Functional data structures are fundamentally \textbf{immutable}, meaning their state cannot be changed after creation \cite{okasaki}.
-This design choice is crucial for ensuring \textbf{referential transparency}---a property where an expression can be replaced by its value without altering the program's behavior.
-In-place modifications, common in imperative data structures, introduce side effects that violate this property and complicate reasoning, especially in concurrent environments \cite{okasaki}.
+Functional data structures are \textbf{immutable}, meaning their state cannot be changed after creation \cite{okasaki}.
+This immutability guarantees \textbf{referential transparency}: an expression can always be replaced by its value without altering program behavior.
+By contrast, in-place modifications, common in imperative data structures, introduce side effects that complicate reasoning, especially in concurrent environments \cite{okasaki}.
 
-To work with immutable structures, operations do not modify them directly.
-Instead, they produce a new, updated version while preserving the original.
-This approach is known as \textbf{persistence}.
-The seminal work in this area, Chris Okasaki's \textit{Purely Functional Data Structures}, provides the foundation for implementing these structures efficiently \cite{okasaki}.
-The key to their performance is \textbf{structural sharing}.
-For example, when adding an element to a tree, only the nodes on the path to the new element are recreated.
-The remainder of the tree is unchanged and shared between the old and new versions, minimizing memory overhead.
+To support updates without mutation, functional data structures rely on \textbf{persistence}: operations return a new version of the structure while preserving the original.
+The seminal work in this area, Okasaki's \textit{Purely Functional Data Structures}, shows how persistence can be implemented efficiently through \textbf{structural sharing}.
+For example, when inserting into a tree, only the nodes along the update path are recreated, while the rest of the structure is reused.
+This design minimizes memory overhead while preserving previous versions.
 
-These combined properties—immutability to guarantee referential transparency, and persistence made efficient through structural sharing—not only improve modularity but also greatly facilitate formal reasoning and verification, as invariants are preserved across all versions of the structure \cite{okasaki}.
+These properties, immutability, persistence, and structural sharing, not only improve modularity but also make functional data structures particularly well suited to formal verification.
+Invariants remain stable across all versions, allowing correctness properties to be reasoned about compositionally.
+This thesis builds on these principles, focusing on priority queues as a case study of verified functional data structures.
 
 In the following chapter, we will explore priority queues, a specific type of functional data structure that benefits from these principles.
+
 \section{Program Verification Techniques}
 
 The goal of program verification is to formally prove that a program behaves according to its specification.
 A foundational approach is \textbf{deductive verification}, which uses logical reasoning to establish correctness.
-This is often based on the principles of Hoare logic, where programs are annotated with pre-conditions and post-conditions \cite{Hoare69}.
+This is often based on the principles of Hoare logic, where programs are annotated with preconditions and postconditions \cite{Hoare69}.
 
 Traditionally, proving these properties required significant manual effort using interactive theorem provers.
 However, modern techniques increasingly focus on automation by leveraging \textbf{Satisfiability Modulo Theories (SMT) solvers}.
 These solvers are powerful engines that can automatically determine the satisfiability of logical formulas over various background theories (e.g., integers, arrays, bit-vectors).
-The groundwork for combining logical theories, which is central to SMT solvers, was laid by seminal works such as the Nelson-Oppen procedure \cite{Nelson79} and Shostak's method \cite{Shostak84}.
+The groundwork for combining logical theories, which is central to SMT solvers, was laid by seminal works such as the Nelson–Oppen procedure \cite{Nelson79} and Shostak's method \cite{Shostak84}.
 
 This thesis focuses on \textbf{refinement types}, a lightweight verification technique that extends a language's type system to encode logical predicates.
-The concept was notably advanced in the paper "Liquid Types" by Rondon, Jhala, and Kawaguci, who proposed a system to automatically infer and check refinement types using an SMT solver \cite{rondonLiquidTypes2008}.
+The concept was notably advanced in the paper ``Liquid Types'' by Rondon, Jhala, and Kawaguchi, who proposed a system to automatically infer and check refinement types using an SMT solver \cite{rondonLiquidTypes2008}.
 Their primary motivation was to reduce the significant annotation and proof burden associated with full dependent type systems, making formal verification more accessible to programmers.
 \texttt{LiquidHaskell}, the tool used in this thesis, is a direct evolution of this work, integrating refinement type checking seamlessly into the Haskell development environment \cite{vazou2014}.
 By embedding specifications directly into types, developers can catch invariant violations at compile time with a high degree of automation.
@@ -42,24 +44,23 @@ By embedding specifications directly into types, developers can catch invariant 
 
 The verification of data structure invariants has been a long-standing goal in the formal methods community.
 While this thesis uses \texttt{LiquidHaskell}, other powerful tools exist, each with different trade-offs regarding automation, expressiveness, and proof effort.
-We compare our approach with verification in Coq, Agda.
+We compare our approach with verification in Coq and Agda.
 
 \subsection{Verification in Interactive Theorem Provers (Coq and Agda)}
 
-Interactive theorem provers like Coq and Agda represent the gold standard for formal verification, offering a very high degree of assurance.
-Type-level computation is employed to enable rigorous reasoning about the termination of user-defined functions.
+Interactive theorem provers such as Coq and Agda represent the gold standard for formal verification, offering a very high degree of assurance.
+Type-level computation is employed to enable rigorous reasoning about the termination of user-defined functions \cite{vazou2018}.
 This approach requires users to provide lemmas or rewrite hints to assist in proving properties within decidable theories \cite{vazou2018}.
 
-
 In \textbf{Coq}, data structures are commonly verified using a model-based approach.
-The process involves defining a logical model—a multiset of elements, represented as a list where order is proven irrelevant—and then proving that a concrete implementation correctly simulates the abstract operations on the multiset \cite{VerifiedFunctional}.
+The process involves defining a logical model---a multiset of elements, represented as a list where order is proven irrelevant---and then proving that a concrete implementation correctly simulates the abstract operations on the multiset \cite{VerifiedFunctional}.
 This involves defining the data structure, its representation invariants, and its operations within Coq's logic (the Calculus of Inductive Constructions), and then interactively proving the correspondence using tactics.
 While this method is powerful for ensuring correctness, it can be labor-intensive and require significant expertise in formal methods.
 
-\textbf{Agda} is a dependently-typed functional programming language where proofs are programs and propositions are types (the Curry-Howard correspondence).
+\textbf{Agda} is a dependently typed functional programming language where proofs are programs and propositions are types (the Curry–Howard correspondence) \cite{agda-doc}.
 This allows properties to be encoded directly in the types of the data structures themselves.
 This approach ensures that any well-typed implementation is correct by construction.
-However, like Coq, it demands a deep understanding of dependent type theory and can lead to complex type definitions and proof terms that require significant manual development.
+However, like Coq, it demands a deep understanding of dependent type theory and can lead to complex type definitions and proof terms that require significant manual development \cite{vazou2018}.
 
-Compared to \texttt{LiquidHaskell}, these systems provide stronger guarantees (as the entire logic is verified within a trusted kernel), but at the cost of automation.
-\texttt{LiquidHaskell}, by contrast, outsources proof obligations to an external SMT solver, automating large parts of the verification process and requiring less interactive guidance from the user.
+Compared to \texttt{LiquidHaskell}, these systems provide stronger guarantees (as the entire logic is verified within a trusted kernel), but at the cost of automation \cite{vazou2018}.
+\texttt{LiquidHaskell}, by contrast, outsources proof obligations to an external SMT solver, automating large parts of the verification process and requiring less interactive guidance from the user \cite{vazou2014}.
