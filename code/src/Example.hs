@@ -1,8 +1,7 @@
 module Example where
-import 
 
-import Prelude hiding (lookup, max)
 import Language.Haskell.Liquid.ProofCombinators
+import Prelude hiding (lookup, max)
 
 {-@ LIQUID "--reflection"      @-}
 {-@ fib :: i:Nat -> Int  @-}
@@ -66,17 +65,3 @@ posList = Cons 2 (Cons 4 Nil)
 {-@ okSorted :: SortedList @-}
 okSorted :: PList Int
 okSorted = Cons 2 (Cons 4 Nil)
-
-{-@ assoc :: xs:[a] -> ys:[a] -> zs:[a]
--> { (xs ++ ys) ++ zs = xs ++ (ys ++ zs) } @-}
-assoc :: [a] -> [a] -> [a] -> ()
-assoc [] ys zs = ([] ++ ys) ++ zs
-=== ys ++ zs
-=== [] ++ (ys ++ zs)
-*** QED
-
-assoc (x : xs) ys zs = ((x : xs) ++ ys) ++ zs
-===  x : (xs ++ ys) ++ zs
-=== (x : ((xs ++ ys) ++ zs) ? assoc xs ys zs)
-=== (x : xs) ++ (ys ++ zs)
-*** QED

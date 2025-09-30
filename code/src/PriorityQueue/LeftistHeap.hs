@@ -12,14 +12,16 @@ import Prelude hiding (min)
 data LeftistHeap a = EmptyHeap | HeapNode {value :: a, left :: (LeftistHeap a), right :: (LeftistHeap a), rank :: Int}
   deriving (Show, Eq)
 
+{-@ type LeftistHeapBound a X = { h : LeftistHeap a | isLowerBound X h} @-}
 {-@ data LeftistHeap a = EmptyHeap
       | HeapNode { value :: a
-         , left  :: {h : LeftistHeap a | isLowerBound value h}
-         , right :: {v : LeftistHeap a  | isLowerBound value v
-                    && rrank v <= rrank left }
+         , left  :: LeftistHeapBound a value
+         , right :: {v : LeftistHeapBound a value  | rrank v <= rrank left }
          , rank :: {r : Nat | r == 1 + rrank right}
         }
- @-}
+@-}
+
+{-@ type Nat = {v:Int | 0 <= v} @-}
 
 {-@ measure size @-}
 {-@ size :: LeftistHeap a -> Nat @-}
@@ -94,7 +96,7 @@ lemma_isLowerBound_transitive :: (Ord a) => a -> a -> LeftistHeap a -> Proof
 lemma_isLowerBound_transitive x y EmptyHeap = ()
 lemma_isLowerBound_transitive x y (HeapNode z l r _) = lemma_isLowerBound_transitive x y l &&& lemma_isLowerBound_transitive x y r *** QED
 
-{-@ lemma_merge_case1 :: x1 : a  -> x2 : { v : a |  x1  <= v}-> r1 : {h : LeftistHeap a | isLowerBound x1 h} -> h2 : {h : LeftistHeap a | not (heapIsEmpty h) && isLowerBound x2 h}  -> {isLowerBound x1 (heapMerge r1 h2)} / [size r1, size h2 , 1]@-}
+{-@ lemma_merge_case1 :: x1 : a  -> x2 : { v : a |  x1  <= v}-> r1 : LeftistHeapBound a x1 -> h2 : {h : LeftistHeapBound a x2 | not (heapIsEmpty h)}  -> {isLowerBound x1 (heapMerge r1 h2)} / [size r1, size h2, 1]@-}
 lemma_merge_case1 :: (Ord a) => a -> a -> LeftistHeap a -> LeftistHeap a -> Proof
 lemma_merge_case1 x1 x2 EmptyHeap h2 =
   isLowerBound x1 (heapMerge EmptyHeap h2)
