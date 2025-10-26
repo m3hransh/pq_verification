@@ -1,7 +1,11 @@
-module Example where
+{-# LANGUAGE FlexibleInstances #-}
+
+module Example (PList (..), PriorityQueue (..), MinView (..), ToppedTree, BinTree (..), add) where
+
+import PriorityQueue.Base
 
 import Language.Haskell.Liquid.ProofCombinators
-import Prelude hiding (lookup, max)
+import Prelude hiding (lookup, max, sum)
 
 {-@ LIQUID "--reflection"      @-}
 {-@ fib :: i:Nat -> Int  @-}
@@ -65,3 +69,133 @@ posList = Cons 2 (Cons 4 Nil)
 {-@ okSorted :: SortedList @-}
 okSorted :: PList Int
 okSorted = Cons 2 (Cons 4 Nil)
+
+data Person = P
+  { name :: String
+  , age :: Int
+  }
+  deriving (Show, Eq)
+
+map' :: (a -> b) -> PList a -> PList b
+map' f Nil = Nil
+map' f (Cons x xs) = Cons (f x) (map' f xs)
+
+data Tree a = Leaf | Node a (Tree a) (Tree a)
+  deriving (Show, Eq)
+
+mapTree :: (a -> b) -> Tree a -> Tree b
+mapTree f Leaf = Leaf
+mapTree f (Node x left right) = Node (f x) (mapTree f left) (mapTree f right)
+
+class Functor' f where
+  fmap' :: (a -> b) -> f a -> f b
+
+instance Functor' PList where
+  fmap' = map'
+
+instance Functor' Tree where
+  fmap' = mapTree
+
+agePeoplePlusOne :: (Functor' f) => f Person -> f Person
+agePeoplePlusOne col = fmap' (\x -> P (name x) (age x + 1)) col
+
+getAges :: (Functor' f) => f Person -> f Int
+getAges col = fmap' age col
+
+instance PriorityQueue PList where
+  empty = Nil
+  isEmpty Nil = True
+  isEmpty _ = False
+  insert x xs = Cons x xs
+  merge Nil ys = ys
+  merge (Cons x xs) ys = Cons x (merge xs ys)
+  findMin xs = case splitMin xs of
+    EmptyView -> Nothing
+    Min v _ -> Just v
+  splitMin Nil = EmptyView
+  splitMin (Cons x xs) = case splitMin xs of
+    EmptyView -> Min x Nil
+    Min v rest ->
+      if x <= v
+        then Min x xs
+        else Min v (Cons x rest)
+
+type ToppedTree a = MinView BinTree a
+data BinTree a = BLeaf | BNode a (BinTree a) (BinTree a)
+  deriving (Show, Eq)
+
+mergeToppedTrees :: (Ord a) => ToppedTree a -> ToppedTree a -> ToppedTree a
+mergeToppedTrees EmptyView EmptyView = EmptyView
+mergeToppedTrees EmptyView ys@(Min _ _) = ys
+mergeToppedTrees xs@(Min _ _) EmptyView = xs
+mergeToppedTrees (Min a t) (Min b u) =
+  if a <= b
+    then Min a (BNode b u t)
+    else Min b (BNode a t u)
+
+instance PriorityQueue (MinView BinTree) where
+  empty = EmptyView
+  isEmpty EmptyView = True
+  isEmpty _ = False
+  insert x q = merge (Min x BLeaf) q
+
+  merge = mergeToppedTrees
+
+  findMin EmptyView = Nothing
+  findMin (Min v _) = Just v
+  splitMin EmptyView = EmptyView
+  splitMin (Min v rest) = Min v (secondBest rest)
+   where
+    secondBest BLeaf = EmptyView
+    secondBest (BNode x left right) = merge (Min x left) (secondBest right)
+
+class (Eq b) => BinaryDigit b where
+  zero :: b
+  carry, sum :: b -> b -> b
+
+halfAdder :: (BinaryDigit b) => b -> b -> (b, b)
+halfAdder x y = (sum x y, carry x y)
+
+fullAdder :: (BinaryDigit b) => b -> b -> b -> (b, b)
+fullAdder x y cin =
+  let (s1, c1) = halfAdder x y
+      (s2, c2) = halfAdder s1 cin
+   in (s2, sum c1 c2)
+
+add :: (BinaryDigit b) => [b] -> [b] -> [b]
+add xs ys = addWithCarry xs ys zero
+
+{-@ addWithCarry :: xs:[a] -> ys:[a] -> c:a -> {v:[a] | len v >= len ys} / [len xs, len ys]  @-}
+addWithCarry :: (BinaryDigit b) => [b] -> [b] -> b -> [b]
+addWithCarry [] [] c
+  | c == zero = []
+  | otherwise = [c]
+addWithCarry (x : xs) [] c
+  | c == zero = x : xs
+  | otherwise =
+      let (s, c') = fullAdder x zero c
+       in s : addWithCarry xs [] c'
+addWithCarry [] (y : ys) c =
+  let (s, c') = fullAdder zero y c
+   in s : addWithCarry [] ys c'
+addWithCarry (x : xs) (y : ys) c =
+  let (s, c') = fullAdder x y c
+   in s : addWithCarry xs ys c'
+
+instance BinaryDigit Int where
+  zero = 0
+  sum x y = (x + y) `mod` 2
+  carry x y = if x + y >= 2 then 1 else 0
+
+instance (Ord a) => BinaryDigit (ToppedTree a) where
+  zero = EmptyView
+  sum EmptyView EmptyView = EmptyView
+  sum x@(Min _ _) EmptyView = x
+  sum EmptyView x@(Min _ _) = x
+  sum x@(Min a t) y@(Min b u) = EmptyView
+  carry EmptyView EmptyView = EmptyView
+  carry x@(Min _ _) EmptyView = EmptyView
+  carry EmptyView y@(Min _ _) = EmptyView
+  carry x@(Min a t) y@(Min b u)
+    | a <= b = Min a (BNode b u t)
+    | otherwise = Min b (BNode a t u)

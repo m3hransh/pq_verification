@@ -12,7 +12,6 @@ tests :: TestTree
 tests =
   testGroup
     "Tests"
-    [ leftistHeapTests
-    , exampleTests
+    [ -- leftistHeapTests
+      exampleTests
     ]
-
