@@ -8,9 +8,9 @@ To avoid confusion with FIFO queues, we will refer to them as "heaps" throughout
 Typical operations include:
 \begin{itemize}
 	\item \textbf{insert}: Add a new element with a given priority.
+	\item \textbf{merge}: Combine two priority queues into one.
 	\item \textbf{findMin}: Retrieve the element with the minimum key (in the min-heap variant).
 	\item \textbf{splitMin}: Return a pair consisting of the minimum key and a heap with that minimum element removed.
-	\item \textbf{merge}: Combine two priority queues into one.
 \end{itemize}
 
 Below is the specification of the priority queue interface, defined as a Haskell type class.
@@ -26,8 +26,9 @@ which returns the minimum element and the remaining heap.
 	class PriorityQueue pq where
     empty :: (Ord a) => pq a
     isEmpty :: (Ord a) => pq a -> Bool
-    findMin :: (Ord a) => pq a -> Maybe a
     insert :: (Ord a) => a -> pq a -> pq a
+    merge :: (Ord a) => pq a -> pq a -> pq a
+    findMin :: (Ord a) => pq a -> Maybe a
     splitMin :: (Ord a) => pq a -> MinView pq a
 \end{code}
 
