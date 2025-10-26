@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 
-module Example (PList (..), PriorityQueue (..), MinView (..), ToppedTree, BinTree (..), add) where
+module Example (PList (..), PriorityQueue (..), MinView (..), ToppedTree, BinTree (..), add, BinomialHeap) where
 
 import PriorityQueue.Base
 
@@ -199,3 +199,38 @@ instance (Ord a) => BinaryDigit (ToppedTree a) where
   carry x@(Min a t) y@(Min b u)
     | a <= b = Min a (BNode b u t)
     | otherwise = Min b (BNode a t u)
+
+instance (Ord a) => Ord (ToppedTree a) where
+  t <= EmptyView = True
+  EmptyView <= t = False
+  (Min a _) <= (Min b _) = a <= b
+
+extractMin :: (Ord a) => [ToppedTree a] -> MinView [] (ToppedTree a)
+extractMin [] = EmptyView
+extractMin (t : ts) = case extractMin ts of
+  EmptyView -> Min t []
+  Min v rest
+    | t <= v -> Min t (EmptyView : ts)
+    | otherwise -> Min v (t : rest)
+
+dismantle :: BinTree a -> [ToppedTree a]
+dismantle BLeaf = []
+dismantle (BNode x left right) = Min x left : dismantle right
+
+newtype BinomialHeap a = BinomialHeap [ToppedTree a]
+  deriving (Show, Eq)
+
+instance PriorityQueue BinomialHeap where
+  empty = BinomialHeap []
+  isEmpty (BinomialHeap []) = True
+  isEmpty _ = False
+  insert x xs = merge (BinomialHeap [Min x BLeaf]) xs
+  merge (BinomialHeap xs) (BinomialHeap ys) = BinomialHeap (add xs ys)
+  findMin (BinomialHeap xs) = case extractMin xs of
+    EmptyView -> Nothing
+    Min EmptyView _ -> Nothing
+    Min (Min v _) _ -> Just v
+  splitMin (BinomialHeap xs) = case extractMin xs of
+    EmptyView -> EmptyView
+    Min EmptyView _ -> EmptyView
+    Min (Min a b) rest -> Min a (BinomialHeap (add (reverse (dismantle b)) rest))
