@@ -57,7 +57,7 @@ This allows us to reason about their behavior during verification.
 In the following sections,
 we present the refined type signatures and implementations of the key heap operations,
 along with explanations of how they maintain the invariants of the leftist heap.
-\subsection*{Heap isEmpty}
+\subsection{Heap isEmpty}
 This function checks if the heap is empty.
 There is no invariate to maintain here, but we define a measure to help with other proofs.
 \begin{code}
@@ -67,7 +67,7 @@ There is no invariate to maintain here, but we define a measure to help with oth
   heapIsEmpty EmptyHeap = True
   heapIsEmpty _ = False
 \end{code}
-\subsection*{Heap findMin}
+\subsection{Heap findMin}
 To retrieve the minimum element from a non-empty heap, we define \texttt{heapFindMin}.
 We restrict its input to non-empty heaps and specify that the returned value is a lower bound for the heap.
 As per the heap property, the minimum element is always at the root of the heap.
@@ -79,7 +79,7 @@ This can directly be extracted from the \texttt{HeapNode} and \texttt{LiquidHask
   heapFindMin (HeapNode x _ _ _) = x
 \end{code}
 
-\subsection*{Heap Merge}
+\subsection{Heap Merge}
 The most critical operation for a leftist heap is \texttt{heapMerge}. 
 Its correctness is fundamental to the correctness of \texttt{insert} and \texttt{deleteMin}.
 The type signature for \texttt{heapMerge} specifies its behavior:
@@ -127,9 +127,12 @@ The \texttt{makeHeapNode} requires that its first argument is a lower bound for 
    -> {h : LeftistHeap a | isLowerBound x h}
 
 \end{code}
-\texttt{LiquidHaskell} can automatically verify that \texttt{x1} is a lower bound for \texttt{l1} since \texttt{l1} is a child of the original heap with root \texttt{x1}.
-However, it cannot automatically verify that \texttt{x1} is a lower bound for the second argument, which is the result of \texttt{heapMerge r1 h2}.
-The lemma \texttt{lemma\_merge\_case1} provides this proof.
+In this context, \texttt{LiquidHaskell} can automatically infer that the root value (\texttt{x1} or \texttt{x2}) is a lower bound for the left child, since it is inherited from the parent heap.
+However, for the right child, which is obtained from a recursive call to \texttt{heapMerge}, the proof must be supplied explicitly.
+This proof obligation is discharged by auxiliary lemmas such as \texttt{lemma\_merge\_case1} and \texttt{lemma\_merge\_case2}.
+
+The first lemma, \texttt{lemma\_merge\_case1}, handles the case where \texttt{x1 <= x2}.
+It states that if \texttt{x1} is a lower bound for \texttt{r1} and \texttt{x2} is a lower bound for \texttt{h2}, then \texttt{x1} is also a lower bound for the result of merging \texttt{r1} and \texttt{h2}.
 \begin{code}
   lemma_merge_case1 :: x1 : a
     -> x2 : {a |  x1  <= x2}
@@ -139,10 +142,7 @@ The lemma \texttt{lemma\_merge\_case1} provides this proof.
     / [size r1, size h2, 1]
 \end{code}
 
-This lemma states that if \texttt{x1} is a lower bound for \texttt{r1} and \texttt{x1 <= x2} where \texttt{x2} is a lower bound for \texttt{h2},
-then \texttt{x1} must also be a lower bound for the result of merging \texttt{r1} and \texttt{h2}.
-
-To prove this lemma, we perform case analysis on \texttt{r1}:
+The proof proceeds by case analysis on the structure of \texttt{r1}.
 
 \begin{code}
   lemma_merge_case1 x1 x2 EmptyHeap h2 =
@@ -157,12 +157,15 @@ To prove this lemma, we perform case analysis on \texttt{r1}:
     heapMerged = heapMerge r1 h2
 \end{code}
 
-\begin{itemize}
+In the base case, when \texttt{r1} is empty, the merge simply returns \texttt{h2}.
+Since \texttt{x1 <= x2} and \texttt{x2} is a lower bound for \texttt{h2}, it follows by transitivity that \texttt{x1} is also a lower bound for \texttt{h2}.
+In the inductive case, both heaps are non-empty.
+The result of \texttt{heapMerge r1 h2} again satisfies the lower-bound property, which is established through the transitive lemma below.
 
-\item For the base case where \texttt{r1} is \texttt{EmptyHeap}, the result of \texttt{heapMerge EmptyHeap h2} is simply \texttt{h2}.
-And since \texttt{x1 <= x2} and \texttt{x2} is a lower bound for \texttt{h2},
-we can conclude using \texttt{lemma\_isLowerBound\_transitive} that \texttt{x1} is also a lower bound for \texttt{h2}.
-The lemma is stated as follows:
+
+\subsubsection*{Transitivity of Lower Bounds}
+The lemma \texttt{lemma\_isLowerBound\_transitive} expresses the fundamental transitivity of the lower-bound relation across heaps.
+It is used repeatedly throughout the verification of heap merge.
 \begin{code}
 {-@ lemma_isLowerBound_transitive :: x : a
       -> y : {v : a | x <= v}
@@ -174,12 +177,25 @@ lemma_isLowerBound_transitive x y EmptyHeap = ()
 lemma_isLowerBound_transitive x y (HeapNode z l r _) = lemma_isLowerBound_transitive x y l &&& lemma_isLowerBound_transitive x y r *** QED
 \end{code}
 
+This lemma formalizes the intuitive notion that if \texttt{x <= y} and \texttt{y} is a lower bound for all elements of a heap \texttt{h}, then \texttt{x} must also be a lower bound for \texttt{h}.
+It is a small but essential proof component that supports most of the recursive heap reasoning.
 
-\item For the inductive case where \texttt{r1} is a \texttt{HeapNode}, we again use
-  \\ \texttt{lemma\_isLowerBound\_transitive}.
-Additionally, we relay on mutual recursion between \texttt{heapMerge} and \texttt{lemma\_merge\_case1} to handle the recursive structure of the heaps.
+\subsubsection*{Symmetric Case}
+A symmetric argument applies to the case where \texttt{x1 > x2}.
+The second lemma, \texttt{lemma\_merge\_case2}, follows the same structure as \texttt{lemma\_merge\_case1} but exchanges the roles of the input heaps and their bounds.
 
-\end{itemize}
+\begin{code}
+  lemma_heapMerge_case2 :: x2 : a
+    -> x1 : { v : a |  x2  <= v}
+    -> r1 : {h : LeftistHeap a | isLowerBound x2 h}
+    -> h2 : {h : LeftistHeap a | not (heapIsEmpty h) && isLowerBound x1 h}
+    -> {isLowerBound x2 (heapMerge h2 r1)} 
+    / [size h2, size r1, 1]
+\end{code}
+The reason we cannot simply reuse \texttt{lemma\_merge\_case1} is that the order of the arguments to \texttt{heapMerge} is swapped in this case.
+And also the termination metric must reflect which arguments are reduced in the recursive call.
+We discuss this in the next section.
+
 \subsubsection*{Dealing with Termination and Recursion}
 
 \texttt{LiquidHaskell} must ensure that all recursive functions terminate. 
@@ -203,18 +219,95 @@ To capture this, we use the following termination metric for \texttt{lemma\_merg
 
 Here the final \texttt{1} ensures that 
 \[
-[size\ r1, size\ h2, 0] \;<\; [size\ h1, size\ h2, 1]
+[size\ r1, size\ h2, 0] \;<\; [size\ r1, size\ h2, 1]
 \]
 in lexicographic order. 
-This helps the verifier see that the mutual recursion between \texttt{heapMerge} and \texttt{lemma\_merge\_case1} is terminating.
+This indicates that when \texttt{lemma\_merge\_case1} calls \texttt{heapMerge}, it is making progress towards termination.
 In the same way, other supporting lemmas are also assigned termination metrics, which are automatically checked by the verifier.
-\subsection*{Other Heap Operations}
-With \texttt{heapMerge} verified, the correctness of other operations follows more easily:
+
+
+Together, these lemmas ensure that \texttt{heapMerge} preserves the heap property and terminates correctly for all valid inputs.
+They form the core of the mechanized proof that merging two leftist heaps yields a well-formed, correctly ordered, and element-preserving result.
+\subsection{Heap Insert}
+Heap insertion is implemented using heap merging.
+The refined type signature for \texttt{heapInsert} specifies that
+inserting an element into a non-empty heap produces a new heap where
+the inserted element is a lower bound for the resulting heap if it is smaller than the minimum of the original heap
+and that the multiset of elements is updated accordingly.
+
+\begin{code}
+heapInsert :: x : a
+  -> h1 : LeftistHeap a
+  -> {h : LeftistHeap a |
+        not (heapIsEmpty h1) 
+          => isLowerBound (min x (heapFindMin h1)) h
+        && bag h = B.put x (bag h1) }
+\end{code}
+LiquidHaskell can automatically verify that the properties hold, given the correctness of \texttt{heapMerge}.
+So no additional lemmas are required here.
+
+
+\subsection{Heap SplitMin}
+
+The \texttt{SplitMin} operation decomposes a heap into its minimum element and the remaining heap. 
+If the heap is empty, the result is an empty view. 
+This operation can be expressed elegantly in LiquidHaskell using a single refinement predicate that encodes both cases,
+the empty and non-empty heap, guarded by logical conditions.
+
+\begin{code}
+{-@ predicate SplitOK H S =
+  (heapIsEmpty H => isEmptyView S)
+    && (not (heapIsEmpty H) => not (isEmptyView S)
+      && getMinValue S == heapFindMin H
+      && bag H == B.put (getMinValue S) (bag (getRestHeap S)))
+@-}
+
+{-@ heapSplit :: (Ord a)
+              => h:LeftistHeap a
+              -> { s:MinView LeftistHeap a | SplitOK h s } @-}
+heapSplit :: (Ord a) => LeftistHeap a -> MinView LeftistHeap a
+heapSplit EmptyHeap          = EmptyView
+heapSplit (HeapNode x l r _) = Min x (heapMerge l r)
+\end{code}
+
+The refinement predicate \texttt{SplitOK} expresses the relationship between the input heap \texttt{H} 
+and the result \texttt{S} of the \texttt{heapSplit} operation in a case-distinguishing manner:
+
 \begin{itemize}
-	\item \texttt{heapInsert x h} is simply \texttt{heapMerge (HeapNode x EmptyHeap EmptyHeap 1) h}.
-	\item \texttt{heapDeleteMin h} (or \texttt{splitMin}) is \texttt{heapMerge} of the left and right children of the root.
+  \item \textbf{Empty heap case.}  
+  When \texttt{heapIsEmpty H} holds, the resulting view \texttt{S} must be empty, i.e., \texttt{isEmptyView S} is true.  
+  This ensures that the field selectors \texttt{getMinValue} and \texttt{getRestHeap} are never applied to an empty structure, 
+  maintaining totality of the specification.
+
+  \item \textbf{Non-empty heap case.}  
+  When \texttt{H} is non-empty, the result must be of the form \texttt{Min} with fields \texttt{minValue} and \texttt{restHeap}.  
+  In this branch, the following properties must hold:
+  \begin{enumerate}
+    \item The minimum value of the view matches the minimum of the input heap:
+      \[
+        \texttt{getMinValue S = heapFindMin H}.
+      \]
+    \item The multiset of elements is preserved:
+      \[
+        \texttt{bag H = B.put (getMinValue S) (bag (getRestHeap S))}.
+      \]
+  \end{enumerate}
 \end{itemize}
-The properties proven for \texttt{heapMerge} are thus inherited by these functions.
+
+The implementation follows the specification precisely. 
+For an empty heap, \texttt{heapSplit} simply returns \texttt{EmptyView}. 
+For a non-empty heap of the form \texttt{HeapNode x l r \_}, the result is \texttt{Min x (heapMerge l r)}.
+The correctness of this implementation relies on two key facts:
+
+\begin{enumerate}
+  \item The root element \texttt{x} of a non-empty leftist heap is its minimum, 
+        establishing the equality \texttt{getMinValue S == heapFindMin H}.
+  \item The \texttt{heapMerge} operation preserves the multiset of elements, 
+        ensuring the bag equality in the refinement holds.
+\end{enumerate}
+
+Thus, the \texttt{heapSplit} function correctly decomposes any leftist heap into its minimal element and the remainder,
+while preserving both structural and content invariants as captured by \texttt{SplitOK}.
 \section{Challenges and Workarounds}
 The primary challenge in verifying the leftist heap was proving that the structural invariants are preserved by the recursive \texttt{heapMerge} function. The SMT solver, while powerful, cannot always deduce these properties on its own, especially when they rely on inductive reasoning over a recursive data structure.
 
