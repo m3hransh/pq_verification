@@ -2,7 +2,7 @@
 \label{ch:verification}
 This chapter details the formal verification of the leftist heap implementation using \texttt{LiquidHaskell}. We demonstrate how refinement types can be used to enforce complex structural and behavioral invariants, ensuring the correctness of our priority queue implementation.
 
-\section{Encoding Invariants}
+\section{Refined Data Structure}
 The cornerstone of the verification is the refined data type for the leftist heap itself.
 We encode the core invariants of the data structure directly into its type definition.
 
@@ -36,7 +36,11 @@ This refined definition enforces three key invariants:
 
 By embedding these invariants directly into the type, \texttt{LiquidHaskell}'s verifier will ensure that any function constructing or modifying a \texttt{LeftistHeap} respects them.
 
-\section{Use of Measures and Predicates}
+\section{Refined Heap Operations}
+Following the interface defined in Chapter~\ref{lst:pq}, we refine the types of the heap operations to ensure they maintain the invariants of the leftist heap.
+Unfortunately, due to limitations in \texttt{LiquidHaskell}'s current support for type classes,
+we cannot directly define the invariants for the \texttt{PriorityQueue} type class.
+Instead, we provide refined type signatures for each operation individually.
 To express these invariants and reason about the behavior of our functions, we use several features of \texttt{LiquidHaskell}.
 
 \textbf{Measures} (see Section~\ref{sec:reflection}) are functions from Haskell's term-level to the refinement logic's domain. We define several measures:
@@ -49,19 +53,35 @@ To express these invariants and reason about the behavior of our functions, we u
 \textbf{Reflected Functions} (see Section~\ref{sec:reflection}) allow us to use standard Haskell functions within the refinement logic. We use this for \texttt{isLowerBound}, \texttt{heapMerge}, and \texttt{makeHeapNode}.
 This allows us to reason about their behavior during verification.
 
-\textbf{Predicates} are aliases for refinement types that improve readability. For instance, we define predicates to describe the post-conditions of the \texttt{heapMerge} function:
+
+In the following sections,
+we present the refined type signatures and implementations of the key heap operations,
+along with explanations of how they maintain the invariants of the leftist heap.
+\subsection*{Heap isEmpty}
+This function checks if the heap is empty.
+There is no invariate to maintain here, but we define a measure to help with other proofs.
 \begin{code}
- predicate HeapMergeMin H1 H2 H = 
-    ((not (heapIsEmpty H1) && not (heapIsEmpty H2)) => 
-    isLowerBound (min (heapFindMin H1) (heapFindMin H2)) H )
- predicate BagUnion H1 H2 H = 
-    (bag H == B.union (bag H1) (bag H2))
+  {-@ measure heapIsEmpty @-}
+  {-@ heapIsEmpty :: LeftistHeap a -> Bool @-}
+  heapIsEmpty :: (Ord a) => LeftistHeap a -> Bool
+  heapIsEmpty EmptyHeap = True
+  heapIsEmpty _ = False
 \end{code}
-\texttt{HeapMergeMin} asserts that the resulting heap \texttt{H} respects the heap property relative to the minimum elements of the input heaps \texttt{H1} and \texttt{H2}. \texttt{BagUnion} asserts that the elements in the merged heap are the union of the elements from the input heaps.
+\subsection*{Heap findMin}
+To retrieve the minimum element from a non-empty heap, we define \texttt{heapFindMin}.
+We restrict its input to non-empty heaps and specify that the returned value is a lower bound for the heap.
+As per the heap property, the minimum element is always at the root of the heap.
+This can directly be extracted from the \texttt{HeapNode} and \texttt{LiquidHaskell} can verify that this value is indeed a lower bound for the entire heap.
+\begin{code}
+  {-@ heapFindMin :: h : {h : LeftistHeap a | not (heapIsEmpty h)} 
+        -> {v : a | isLowerBound v h} @-}
+  heapFindMin :: (Ord a) => LeftistHeap a -> a
+  heapFindMin (HeapNode x _ _ _) = x
+\end{code}
 
-\section{Example Proofs}
-The most critical operation for a leftist heap is \texttt{heapMerge}. Its correctness is fundamental to the correctness of \texttt{insert} and \texttt{deleteMin}.
-
+\subsection*{Heap Merge}
+The most critical operation for a leftist heap is \texttt{heapMerge}. 
+Its correctness is fundamental to the correctness of \texttt{insert} and \texttt{deleteMin}.
 The type signature for \texttt{heapMerge} specifies its behavior:
 \begin{code}
   heapMerge :: h1 : LeftistHeap a 
@@ -70,31 +90,97 @@ The type signature for \texttt{heapMerge} specifies its behavior:
                              && (BagUnion h1 h2 h)}
         / [size h1, size h2, 0]
 \end{code}
-This signature guarantees that merging two valid leftist heaps results in a new valid leftist heap, that the heap property is maintained, and that the set of elements is preserved.
+This signature guarantees that merging two valid leftist heaps results in a new valid leftist heap,
+that the heap property is maintained, and that the set of elements is preserved.
 
-The implementation of \texttt{heapMerge} involves a recursive call. To help the SMT solver prove that the invariants hold through this recursion, we provide helper lemmas. For example, in the case where \texttt{x1 <= x2}, we merge the right child of the first heap (\texttt{r1}) with the second heap (\texttt{h2}). We must prove to \texttt{LiquidHaskell} that the root value \texttt{x1} is a lower bound for this newly merged heap.
+To express these properties, we have defined two predicates:
 \begin{code}
-... makeHeapNode x1 l1 ((heapMerge r1 h2) 
-    `withProof` lemma_merge_case1 x1 x2 r1 h2)
+ predicate HeapMergeMin H1 H2 H = 
+    ((not (heapIsEmpty H1) && not (heapIsEmpty H2)) => 
+    isLowerBound (min (heapFindMin H1) (heapFindMin H2)) H )
+ predicate BagUnion H1 H2 H = 
+    (bag H == B.union (bag H1) (bag H2))
 \end{code}
+
+\texttt{HeapMergeMin} asserts that the resulting heap \texttt{H} respects the heap property relative to the minimum elements of the input heaps \texttt{H1} and \texttt{H2}.
+\texttt{BagUnion} asserts that the elements in the merged heap are the union of the elements from the input heaps.
+
+The implementation of \texttt{heapMerge} involves a recursive call.
+To help the SMT solver prove that the invariants hold through this recursion,
+we provide helper lemmas. For example, in the case where \texttt{x1 <= x2},
+we merge the right child of the first heap (\texttt{r1}) with the second heap (\texttt{h2}).
+We must provide the proof for \texttt{LiquidHaskell} that the root value \texttt{x1} is a lower bound for this newly merged heap.
+
+\begin{code}
+heapMerge h1@(HeapNode x1 l1 r1 _) h2@(HeapNode x2 l2 r2 _)
+  | x1 <= x2 = makeHeapNode x1 l1 ((heapMerge r1 h2) 
+    `withProof` lemma_merge_case1 x1 x2 r1 h2)
+  | otherwise = makeHeapNode x2 l2 ((heapMerge h1 r2)
+    `withProof` lemma_heapMerge_case2 x2 x1 r2 h1)
+\end{code}
+
+The \texttt{makeHeapNode} requires that its first argument is a lower bound for both its left and right children.
+\begin{code}
+  makeHeapNode :: x : a
+   -> {h : LeftistHeap a | isLowerBound x h}
+   -> {h : LeftistHeap a | isLowerBound x h}
+   -> {h : LeftistHeap a | isLowerBound x h}
+
+\end{code}
+\texttt{LiquidHaskell} can automatically verify that \texttt{x1} is a lower bound for \texttt{l1} since \texttt{l1} is a child of the original heap with root \texttt{x1}.
+However, it cannot automatically verify that \texttt{x1} is a lower bound for the second argument, which is the result of \texttt{heapMerge r1 h2}.
 The lemma \texttt{lemma\_merge\_case1} provides this proof.
 \begin{code}
-  lemma_merge_case1 :: x1 : a  
-        -> x2 : {v : a |  x1  <= v}
-        -> r1 : LeftistHeapBound a x1 
-        -> h2 : {h : LeftistHeapBound a x3 | not (heapIsEmpty h) }  
-        -> {isLowerBound x1 (heapMerge r1 h2)}
+  lemma_merge_case1 :: x1 : a
+    -> x2 : {a |  x1  <= x2}
+    -> r1 : LeftistHeapBound a x1
+    -> h2 : {LeftistHeapBound a x2 | not (heapIsEmpty h2)}
+    -> {isLowerBound x1 (heapMerge r1 h2)}
+    / [size r1, size h2, 1]
 \end{code}
-This lemma states that if \texttt{x1} is a lower bound for \texttt{r1} and \texttt{x1 <= x2} where \texttt{x2} is a lower bound for \texttt{h2}, then \texttt{x1} must also be a lower bound for the result of merging \texttt{r1} and \texttt{h2}.
 
-With \texttt{heapMerge} verified, the correctness of other operations follows more easily:
+This lemma states that if \texttt{x1} is a lower bound for \texttt{r1} and \texttt{x1 <= x2} where \texttt{x2} is a lower bound for \texttt{h2},
+then \texttt{x1} must also be a lower bound for the result of merging \texttt{r1} and \texttt{h2}.
+
+To prove this lemma, we perform case analysis on \texttt{r1}:
+
+\begin{code}
+  lemma_merge_case1 x1 x2 EmptyHeap h2 =
+    isLowerBound x1 (heapMerge EmptyHeap h2)
+      ? lemma_isLowerBound_transitive x1 x2 h2
+      *** QED
+  lemma_merge_case1 x1 x2 r1@(HeapNode _ _ _ _) h2@(HeapNode _ _ _ _) =
+    isLowerBound x1 (heapMerged)
+      ? (lemma_isLowerBound_transitive x1 (min (heapFindMin r1) (heapFindMin h2)) (heapMerged))
+      *** QED
+   where
+    heapMerged = heapMerge r1 h2
+\end{code}
+
 \begin{itemize}
-	\item \texttt{heapInsert x h} is simply \texttt{heapMerge (HeapNode x EmptyHeap EmptyHeap 1) h}.
-	\item \texttt{heapDeleteMin h} (or \texttt{splitMin}) is \texttt{heapMerge} of the left and right children of the root.
-\end{itemize}
-The properties proven for \texttt{heapMerge} are thus inherited by these functions.
 
-\section{Dealing with Termination and Recursion}
+\item For the base case where \texttt{r1} is \texttt{EmptyHeap}, the result of \texttt{heapMerge EmptyHeap h2} is simply \texttt{h2}.
+And since \texttt{x1 <= x2} and \texttt{x2} is a lower bound for \texttt{h2},
+we can conclude using \texttt{lemma\_isLowerBound\_transitive} that \texttt{x1} is also a lower bound for \texttt{h2}.
+The lemma is stated as follows:
+\begin{code}
+{-@ lemma_isLowerBound_transitive :: x : a
+      -> y : {v : a | x <= v}
+      -> h : {h : LeftistHeap a | isLowerBound y h}
+      -> {isLowerBound x h}
+@-}
+lemma_isLowerBound_transitive :: (Ord a) => a -> a -> LeftistHeap a -> Proof
+lemma_isLowerBound_transitive x y EmptyHeap = ()
+lemma_isLowerBound_transitive x y (HeapNode z l r _) = lemma_isLowerBound_transitive x y l &&& lemma_isLowerBound_transitive x y r *** QED
+\end{code}
+
+
+\item For the inductive case where \texttt{r1} is a \texttt{HeapNode}, we again use
+  \\ \texttt{lemma\_isLowerBound\_transitive}.
+Additionally, we relay on mutual recursion between \texttt{heapMerge} and \texttt{lemma\_merge\_case1} to handle the recursive structure of the heaps.
+
+\end{itemize}
+\subsubsection*{Dealing with Termination and Recursion}
 
 \texttt{LiquidHaskell} must ensure that all recursive functions terminate. 
 For \texttt{heapMerge}, we provide the following termination metric:
@@ -122,6 +208,13 @@ Here the final \texttt{1} ensures that
 in lexicographic order. 
 This helps the verifier see that the mutual recursion between \texttt{heapMerge} and \texttt{lemma\_merge\_case1} is terminating.
 In the same way, other supporting lemmas are also assigned termination metrics, which are automatically checked by the verifier.
+\subsection*{Other Heap Operations}
+With \texttt{heapMerge} verified, the correctness of other operations follows more easily:
+\begin{itemize}
+	\item \texttt{heapInsert x h} is simply \texttt{heapMerge (HeapNode x EmptyHeap EmptyHeap 1) h}.
+	\item \texttt{heapDeleteMin h} (or \texttt{splitMin}) is \texttt{heapMerge} of the left and right children of the root.
+\end{itemize}
+The properties proven for \texttt{heapMerge} are thus inherited by these functions.
 \section{Challenges and Workarounds}
 The primary challenge in verifying the leftist heap was proving that the structural invariants are preserved by the recursive \texttt{heapMerge} function. The SMT solver, while powerful, cannot always deduce these properties on its own, especially when they rely on inductive reasoning over a recursive data structure.
 
