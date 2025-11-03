@@ -1,4 +1,5 @@
 \chapter { LiquidHaskell Overview }
+\label{ch:lh}
 \texttt{LiquidHaskell} is a static verification tool that extends Haskell with
 \emph{refinement types}. In essence, it augments Haskell’s type system with
 logical predicates that are automatically checked by an SMT (Satisfiability
@@ -155,6 +156,7 @@ The type of second argument states that the list \texttt{xs} must have length gr
 In Section \ref{sec:reflection}, we will show how to define and use user-defined functions in the refinement logic.
 
 \section{Refined Data Types}
+\label{sec:lh-refined-datatypes}
 In the previous examples, we saw how refinements of input and output of function allow us to have stronger arguments about our program.
 We can take this further by refining the data types.
 We use the following example as an illustration, following~\cite{jhala2020}:
@@ -301,6 +303,7 @@ LiquidHaskell can verify that the following list is sorted:
 \input{figures/plist.tex}
 % The abstraction allows us to define other properties as well, such as strictly increasing lists, by changing the predicate.
 \section{Equational Proofs}
+\label{sec:proofs}
 \texttt{LiquidHaskell} allows formulation of proofs following the style of calculational or equational reasoning popularized in classic texts
 and implemented in proof assistants like Coq and Agda \cite{vazou2018}.
 It comes with the proof combinators library that allows to make the proofs more readable.
@@ -512,6 +515,7 @@ For such functions, termination checking can be disabled locally with the \textt
 \end{code}
 
 \section{Proof by Logical Evaluation}
+\label{sec:lh-ple}
 In our proof in code \ref{lst:associative}, we primarily relied on straightforward unfoldings of the \texttt{(++)} function definition.
 However, \texttt{LiquidHaskell} provides a directive known as \texttt{Proof by Logical Evaluation} (PLE), which offers two significant advantages \cite{vazou2018}.
 First, PLE is guaranteed to construct an equational proof whenever one can be derived solely from unfoldings of function definitions, provided the user supplies necessary lemmas and induction hypotheses \cite{vazou2018}.

@@ -1,8 +1,34 @@
 \chapter{Verification in LiquidHaskell}
 \label{ch:verification}
-This chapter details the formal verification of the leftist heap implementation using \texttt{LiquidHaskell}. We demonstrate how refinement types can be used to enforce complex structural and behavioral invariants, ensuring the correctness of our priority queue implementation.
+This chapter verifies our priority queue implementations using LiquidHaskell.
+We first factor out the common logical infrastructure used by both heaps
+(\S\ref{sec:shared-infra}), then present the leftist-heap development
+(\S\ref{sec:verify-leftist}), and finally \emph{only} those parts of the
+binomial heap for which we currently have mechanized proofs (\S\ref{sec:verify-binomial}).
+Throughout, we refer back to Chapter~\ref{ch:lh} for the LiquidHaskell
+features we rely on (reflection, measures, PLE, and termination).
 
-\section{Refined Data Structure}
+\section{Shared Logical Infrastructure}
+\label{sec:shared-infra}
+
+We reuse LiquidHaskell features introduced in Chapter~\ref{chap:lh}:
+\begin{itemize}
+  \item \textbf{Measures and refined data types} (\S\ref{sec:reflection}--\ref{sec:lh-refined-datatypes})
+        to expose structural invariants to the refinement logic.
+  \item \textbf{Reflection and equational reasoning} (\S\ref{sec:reflection}, \S\ref{sec:proofs})
+        for unfolding definitions during proofs.
+  \item \textbf{Proof by Logical Evaluation (PLE)} (\S\ref{sec:lh-ple}) to automate unfolding-driven proofs.
+  \item \textbf{Termination metrics} (\S\ref{sec:termination}) using size/height and lexicographic tuples.
+\end{itemize}
+
+We also standardize the following predicate, reused by both heaps:
+\[
+\mathsf{isLowerBound}\ v\ t \ \triangleq\ v \le \text{every element of } t,
+\]
+so that lower-bound obligations can be phrased uniformly for tree- and heap-shaped structures.
+
+\section{Verification of Leftist Heaps}
+\label{sec:verify-leftist}
 The cornerstone of the verification is the refined data type for the leftist heap itself.
 We encode the core invariants of the data structure directly into its type definition.
 
@@ -36,7 +62,8 @@ This refined definition enforces three key invariants:
 
 By embedding these invariants directly into the type, \texttt{LiquidHaskell}'s verifier will ensure that any function constructing or modifying a \texttt{LeftistHeap} respects them.
 
-\section{Refined Heap Operations}
+\subsection{Refined Heap Operations}
+\label{sec:leftist-ops}
 Following the interface defined in Chapter~\ref{lst:pq}, we refine the types of the heap operations to ensure they maintain the invariants of the leftist heap.
 Unfortunately, due to limitations in \texttt{LiquidHaskell}'s current support for type classes,
 we cannot directly define the invariants for the \texttt{PriorityQueue} type class.
@@ -57,7 +84,7 @@ This allows us to reason about their behavior during verification.
 In the following sections,
 we present the refined type signatures and implementations of the key heap operations,
 along with explanations of how they maintain the invariants of the leftist heap.
-\subsection{Heap isEmpty}
+\subsubsection{Heap isEmpty}
 This function checks if the heap is empty.
 There is no invariate to maintain here, but we define a measure to help with other proofs.
 \begin{code}
@@ -67,7 +94,7 @@ There is no invariate to maintain here, but we define a measure to help with oth
   heapIsEmpty EmptyHeap = True
   heapIsEmpty _ = False
 \end{code}
-\subsection{Heap findMin}
+\subsubsection{Heap findMin}
 To retrieve the minimum element from a non-empty heap, we define \texttt{heapFindMin}.
 We restrict its input to non-empty heaps and specify that the returned value is a lower bound for the heap.
 As per the heap property, the minimum element is always at the root of the heap.
@@ -79,7 +106,7 @@ This can directly be extracted from the \texttt{HeapNode} and \texttt{LiquidHask
   heapFindMin (HeapNode x _ _ _) = x
 \end{code}
 
-\subsection{Heap Merge}
+\subsubsection{Heap Merge}
 The most critical operation for a leftist heap is \texttt{heapMerge}. 
 Its correctness is fundamental to the correctness of \texttt{insert} and \texttt{deleteMin}.
 The type signature for \texttt{heapMerge} specifies its behavior:
@@ -228,7 +255,7 @@ In the same way, other supporting lemmas are also assigned termination metrics, 
 
 Together, these lemmas ensure that \texttt{heapMerge} preserves the heap property and terminates correctly for all valid inputs.
 They form the core of the mechanized proof that merging two leftist heaps yields a well-formed, correctly ordered, and element-preserving result.
-\subsection{Heap Insert}
+\subsubsection{Heap Insert}
 Heap insertion is implemented using heap merging.
 The refined type signature for \texttt{heapInsert} specifies that
 inserting an element into a non-empty heap produces a new heap where
@@ -247,7 +274,7 @@ LiquidHaskell can automatically verify that the properties hold, given the corre
 So no additional lemmas are required here.
 
 
-\subsection{Heap SplitMin}
+\subsubsection{Heap SplitMin}
 
 The \texttt{SplitMin} operation decomposes a heap into its minimum element and the remaining heap. 
 If the heap is empty, the result is an empty view. 
@@ -308,8 +335,139 @@ The correctness of this implementation relies on two key facts:
 
 Thus, the \texttt{heapSplit} function correctly decomposes any leftist heap into its minimal element and the remainder,
 while preserving both structural and content invariants as captured by \texttt{SplitOK}.
-\section{Challenges and Workarounds}
-The primary challenge in verifying the leftist heap was proving that the structural invariants are preserved by the recursive \texttt{heapMerge} function. The SMT solver, while powerful, cannot always deduce these properties on its own, especially when they rely on inductive reasoning over a recursive data structure.
+\section{Verification of Binomial Heaps (Selected Parts)}
+\label{sec:verify-binomial}
+This section connects to the implementation in Chapter~\ref{ch:impl},
+(\S\ref{sec:binomial-impl}) and presents proofs for the parts currently
+mechanized in code: (i) the \emph{pennant} and its internal tree invariants,
+(ii) the \emph{link}/\texttt{merge} of two pennants, (iii) rank-correctness of
+bit-level addition (\texttt{bSum}, \texttt{bCarry}, \texttt{bHalfAdder}, \texttt{bFullAdder}),
+and (iv) the termination and rank consistency of \texttt{addWithCarry}.
+We deliberately \emph{omit} proofs for \texttt{findMin} and \texttt{splitMin} at this stage.
 
-The main "workaround" was to guide the solver by providing explicit proofs in the form of lemmas (\texttt{lemma\_merge\_case1} and \texttt{lemma\_heapMerge\_case2}). These lemmas essentially break down the proof of correctness into smaller, more manageable steps that the solver can verify. They act as explicit induction steps. For example, \texttt{lemma\_merge\_case1} proves a key property about the recursive call, which \texttt{LiquidHaskell} can then use to prove the property for the function as a whole. This pattern of using helper lemmas to discharge proof obligations is common in formal verification with refinement types.
+\subsection{Pennants and Internal Tree Invariants}
+\label{sec:binomial-pennant}
+
+We model the pennant as a root key with an internal perfect tree (the ``bin'')
+that holds the remaining elements. We expose its height to the logic and
+assert the lower-bound property at every node. In LiquidHaskell notation:
+\begin{code}
+type BinTreeBound a X = {b : BinTree a | isLowerBound X b}
+data BinTree a = Empty
+      | Bin { value :: a
+          ,left  :: BinTreeBound a value
+          ,right :: BinTreeHeight a (bheight left)
+          ,height :: {h : Nat | h == 1 + bheight right}
+           }
+\end{code}
+The refined \texttt{Pennant} type asserts that the internal tree is a lower-bounded
+perfect tree of the advertised size:
+\begin{code}
+data Pennant a = P { root :: a
+           ,size  :: Nat
+           ,bin   :: {b : BinTreeBound a root | bheight b == size}
+           }
+\end{code}
+These refined data types directly encode the invariants for pennants described in Chapter~\ref{ch:impl}:
+\begin{itemize}
+    \item {\textbf{Minimum Property}:} The refinement on the \texttt{bin} field, \texttt{\{b:BinTreeBound a root | ...\}}, ensures that the pennant's \texttt{root} is a lower bound for all elements in its internal tree \texttt{bin}. This is because \texttt{BinTreeBound a root} is an alias for \texttt{\{h : BinTree a | isLowerBound root h\}}.
+
+    \item {\textbf{Perfect Binary Property}:} The structure of \texttt{BinTree} guarantees that it is a perfect binary tree. The refinement \texttt{right :: BinTreeHeight a (bheight left)} enforces that the left and right children of any node have the same height (\texttt{bheight left == bheight right}). The rank of a node is then one greater than its children's height, which is the definition of a perfect binary tree. The \texttt{bheight b == size} check in the \texttt{Pennant} type connects the pennant's size to the height of its internal tree.
+
+    \item {\textbf{Internal Heap Property}:} Chapter~\ref{ch:impl} describes a \emph{Left-ordering Property}. Our verified implementation uses a standard heap property within the internal \texttt{BinTree} instead. The refinement \texttt{left :: BinTreeBound a value} on the \texttt{Bin} constructor requires that a node's \texttt{value} is a lower bound for its own \texttt{left} subtree. This is a sufficient condition for the correctness of the \texttt{merge} operation on pennants.
+\end{itemize}
+
+\subsection{Pennant Operations}
+
+\subsubsection{Singleton Pennant}
+Creating a singleton pennant, which represents a single element, is a simple operation. The refined type ensures that it correctly forms a pennant of size 0.
+\begin{code}
+{-@ singleton :: Ord a => a -> {v:Pennant a | psize v == 0} @-}
+singleton :: (Ord a) => a -> Pennant a
+singleton x = P x 0 Empty
+\end{code}
+The implementation creates a pennant with the given element \texttt{x} as the root, a size of 0, and an \texttt{Empty} tree as its \texttt{bin}. LiquidHaskell verifies this is valid because \texttt{bheight Empty} is 0, and \texttt{isLowerBound x Empty} is trivially true.
+
+\subsubsection{Link Pennants}
+The core operation on pennants is merging two pennants of the same size \(k\) into one of size \(k+1\).
+The refined signature guarantees the size increase and, more importantly, that the resulting pennant preserves the invariants.
+\begin{code}
+{-@ reflect link @-}
+{-@ link :: Ord a => t1:Pennant a
+    -> t2:{t:Pennant a | psize t == psize t1}
+    -> {v:Pennant a | psize v == psize t1 + 1} @-}
+link :: (Ord a) => Pennant a -> Pennant a -> Pennant a
+link (P x1 s1 t1) (P x2 s2 t2)
+  | x1 <= x2 = P x1 (s1 + 1) (Bin x2 t2 t1 (bheight t1 + 1))
+      `withProof` lemma_isLowerBound_transitive x1 x2 t2
+  | otherwise = P x2 (s1 + 1) (Bin x1 t1 t2 (s1 + 1))
+      `withProof` lemma_isLowerBound_transitive x2 x1 t1
+\end{code}
+The implementation chooses the smaller of the two roots (\texttt{x1} or \texttt{x2}) as the new root. The other pennant's root and tree are used to form a new \texttt{BinTree} node that becomes the \texttt{bin} of the resulting pennant.
+
+Verification of this function hinges on proving that the new pennant satisfies the \emph{Minimum Property}. For example, in the \texttt{x1 <= x2} case, the new root is \texttt{x1}. The new internal tree is \texttt{Bin x2 t2 t1 ...}. To prove \texttt{isLowerBound x1 (Bin x2 t2 t1 ...)}, we must show:
+\begin{enumerate}
+    \item \texttt{x1 <= x2}, which is given by the conditional.
+    \item \texttt{isLowerBound x1 t1}, which is true because \texttt{t1} was the \texttt{bin} of the pennant rooted at \texttt{x1}.
+    \item \texttt{isLowerBound x1 t2}, which requires a proof. We know \texttt{x1 <= x2} and \texttt{isLowerBound x2 t2} (from the input pennant \texttt{t2}). The property follows from transitivity.
+\end{enumerate}
+This final step is not obvious to the SMT solver, so we provide an explicit proof using the \texttt{lemma\_isLowerBound\_transitive}, which is identical in function to the one used for Leftist Heaps (\S\ref{sec:verify-leftist}). This lemma proves that if \texttt{x <= y} and \texttt{y} is a lower bound for a tree, then \texttt{x} is also a lower bound.
+
+\subsection{Bit-level Addition and Rank Correctness}
+The merge operation for binomial heaps is analogous to binary addition. The heap is a list of bits (\texttt{Zero} or \texttt{One}), and merging is a ripple-carry add. LiquidHaskell is used to prove that the ranks of these bits are handled correctly throughout the addition logic.
+
+Each bit is tagged with its rank (or order).
+\begin{code}
+data BinomialBit a =
+      Zero { zorder :: Nat }
+    | One  { oorder :: Nat, pennant :: {p:Pennant a | psize p == oorder}}
+\end{code}
+A \texttt{BinomialHeap} is a list of these bits, with ranks strictly increasing by one at each step. This is enforced by a refined \texttt{PList} type from LiquidHaskell's prelude.
+\begin{code}
+type BinomialHeap a = PList <{\hd v -> rank hd == rank v - 1}> (BinomialBit a)
+\end{code}
+
+The adder logic is built from \texttt{bSum} and \texttt{bCarry} functions, which are combined into half-adders and full-adders. Their refined types guarantee rank-correctness.
+\begin{code}
+bSum:: b1:BinomialBit a -> b2:{b:BinomialBit a | rank b == rank b1}
+         -> {b:BinomialBit a | rank b == rank b1}
+
+bCarry:: b1:{b:BinomialBit a | rank b >= 0}
+          -> b2:{b:BinomialBit a | rank b == rank b1}
+          -> {b:BinomialBit a | rank b == rank b1 + 1}
+\end{code}
+\texttt{bSum} produces a bit of the same rank, while \texttt{bCarry} produces a carry bit of the next higher rank. These are composed into a full-adder, which also guarantees correct output ranks for its sum and carry bits.
+\begin{code}
+  bFullAdder :: b1:BinomialBit a
+      -> b2:{b:BinomialBit a | rank b == rank b1}
+      -> c:{b:BinomialBit a | rank b == rank b1}
+      -> (BinomialBit a, BinomialBit a)
+          <{\s co -> rank s == rank b1 && rank co == rank b1 + 1}> 
+\end{code}
+These rank-preserving properties are essential for the main merge algorithm, \texttt{addWithCarry}, to produce a valid \texttt{BinomialHeap}.
+
+\subsection{Heap Merging with \texttt{addWithCarry}}
+The function \texttt{addWithCarry} implements the ripple-carry addition recursively over the lists of bits. Its refined type is complex, mainly to ensure that the carry bit passed between recursive calls has the expected rank.
+\begin{code}
+  addWithCarry :: h1:BinomialHeap a
+      -> h2:{BinomialHeap a | (bRank h2 == bRank h1 || isNil h1) 
+                              || isNil h2}
+      -> carry:{c:BinomialBit a | ((not isNil h1) => rank carry == bRank h1)
+                                && ((not isNil h2) => rank carry == bRank h2)}
+      -> {b:BinomialHeap a | ...} 
+      / [len h1, len h2, 0]
+\end{code}
+The key properties verified by LiquidHaskell are:
+\begin{itemize}
+    \item \textbf{Termination:} The function terminates, which is guaranteed by the lexicographic metric \texttt{/ [len h1, len h2, 0]}, as each recursive call consumes at least one of the input lists.
+    \item \textbf{Rank Propagation:} The precondition on \texttt{carry} ensures that its rank matches the rank of the bits being processed. For a recursive call, the new carry \texttt{c'} is generated by \texttt{bFullAdder}. We must prove that \texttt{rank c'} matches the rank of the next bits in the lists. The \texttt{PList} invariant that ranks increase by 1 at each step is crucial here. For example, if we process bit \texttt{x} and recurse on \texttt{xs}, the new carry \texttt{c'} will have rank \texttt{rank x + 1}. The \texttt{PList} invariant ensures that the head of \texttt{xs} also has rank \texttt{rank x + 1}, so the precondition for the recursive call holds.
+\end{itemize}
+Lemmas like \texttt{lemma\_rank\_preservation} are used to explicitly prove to the solver that the sum bit produced by the full adder has the correct rank to be prepended to the result of the recursive call, thus maintaining the \texttt{BinomialHeap} invariant.
+
+\paragraph{Out-of-scope (not verified here).}
+We do \emph{not} include proofs for \texttt{findMin} and \texttt{splitMin}; these would
+require additional invariants over the list-of-bits representation (argmin over
+roots and dismantling the perfect tree), which we leave as future work.
+
+
 

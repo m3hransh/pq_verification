@@ -1,5 +1,5 @@
 \chapter{Priority Queue Implementations}
-\label{ch:implementations}
+\label{ch:impl}
 \section{Specification of Priority Queue Interface}
 
 Priority queues are multisets with an associated priority for each element, allowing efficient retrieval of the element with the highest (or lowest) priority.
@@ -121,6 +121,7 @@ Other functions are straightforward to implement.
 In the chapter \ref{ch:verification}, we will verify that these implementations satisfy the priority queue interface and maintain the leftist heap invariants.
 
 \section{Binomial Heap Implementation}
+\label{sec:binomial-impl}
 
 For our verified implementation of binomial heaps, we follow the approach of \emph{binary binomial heaps} as described by Hinze~\cite{Hinze99}. This approach represents a heap as a list of trees, analogous to a binary number, which allows for a clean and efficient implementation of the merge operation.
 
@@ -173,10 +174,10 @@ For instance, adding two \texttt{One} bits of the same rank involves linking the
 Following the ripple-carry adder approach, we define a \texttt{halfAdder} function that takes two bits and produces a sum bit and a carry bit.
 
 \begin{code}[caption={Half Adder for Binomial Bits}, label={lst:bit-half-adder}]
-  halfAdder :: (Ord a) => BinomialBit a
+  bHalfAdder :: (Ord a) => BinomialBit a
                         -> BinomialBit a
                         -> (BinomialBit a, BinomialBit a)
-  halfAdder b1 b2 = (sum b1 b2, carry b1 b2)
+  bHalfAdder b1 b2 = (bSum b1 b2, bCarry b1 b2)
 \end{code}
 
 Additionally, we define a \texttt{fullAdder} function that takes two bits and an incoming carry bit, producing a sum bit and an outgoing carry bit.
@@ -186,23 +187,23 @@ Additionally, we define a \texttt{fullAdder} function that takes two bits and an
                        -> BinomialBit a
                        -> (BinomialBit a, BinomialBit a)
   fullAdder b1 b2 cin = 
-    let (s, c1) = halfAdder b1 b2
-        (s', c2) = halfAdder s c
-     in (s', sum c1 c2)
+    let (s, c1) = bHalfAdder b1 b2
+        (s', c2) = bHalfAdder s c
+     in (s', bSum c1 c2)
 \end{code}
 
-The sum and carry functions handle the logic for combining bits of the same rank according to the rules of binary addition.
-\begin{code}[caption={Sum and Carry Functions}, label={lst:bit-sum-carry}]
-  sum :: (Ord a) => BinomialBit a -> BinomialBit a -> BinomialBit a
-  sum (Zero r) (Zero _) = Zero r
-  sum (Zero r) (One _ p) = One r p
-  sum (One _ p) (Zero r) = One r p
-  sum (One r1 p1) (One r2 p2) = Zero r1
-  carry :: (Ord a) => BinomialBit a -> BinomialBit a -> BinomialBit a
-  carry (Zero r1) (Zero r2) = Zero (r1 + 1)
-  carry (Zero r1) (One _ p2) = Zero (r1 + 1)
-  carry (One _ p1) (Zero r2) = Zero (r2 + 1)
-  carry (One r1 p1) (One _ p2) = One (r1 + 1) (link p1 p2)
+The bSum and bCarry functions handle the logic for combining bits of the same rank according to the rules of binary addition.
+\begin{code}[caption={bSum and bCarry Functions}, label={lst:bit-sum-carry}]
+  bSum :: (Ord a) => BinomialBit a -> BinomialBit a -> BinomialBit a
+  bSum (Zero r) (Zero _) = Zero r
+  bSum (Zero r) (One _ p) = One r p
+  bSum (One _ p) (Zero r) = One r p
+  bSum (One r1 p1) (One r2 p2) = Zero r1
+  bCarry :: (Ord a) => BinomialBit a -> BinomialBit a -> BinomialBit a
+  bCarry (Zero r1) (Zero r2) = Zero (r1 + 1)
+  bCarry (Zero r1) (One _ p2) = Zero (r1 + 1)
+  bCarry (One _ p1) (Zero r2) = Zero (r2 + 1)
+  bCarry (One r1 p1) (One _ p2) = One (r1 + 1) (link p1 p2)
 
 \end{code}
 
