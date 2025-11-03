@@ -23,9 +23,6 @@
 \node[heapnode, below left=1.2cm and 1.2cm of n5] (n8) {8};
 \node[heapnode, below right=1.2cm and 1.2cm of n5] (n10) {10};
 \node[heapnode, below left=1.2cm and 0.5cm of n10] (n15) {15};
-% Null nodes to show the end of paths
-\node[below right=1.2cm and 0.5cm of n10] (null_n10) {$\emptyset$};
-\node[below=1.2cm of n20] (null_n20) {$\emptyset$};
 
 % --- EDGES ---
 % Draw the standard parent-child connections
@@ -33,12 +30,10 @@
 \path[edge] (n5) edge (n8);
 \path[edge] (n5) edge (n10);
 \path[edge] (n10) edge (n15);
-\path[edge, dashed] (n10) edge (null_n10); % Dashed line to null node
 
 % --- RIGHT SPINE ---
 % Draw the right spine in red to highlight it
 \path[spine] (root) edge (n20);
-\path[spine] (n20) edge (null_n20);
 
 % --- LABELS ---
 % Add rank labels below each node
@@ -48,8 +43,6 @@
 \node[ranklabel=n8] (r_n8) {rank=1};
 \node[ranklabel=n10, below left=1pt of n10] (r_n10) {rank=1};
 \node[ranklabel=n15] (r_n15) {rank=1};
-\node[ranklabel=null_n10, text=gray] {rank=0};
-\node[ranklabel=null_n20, text=gray] {rank=0};
 
 % --- PROPERTY CHECKS ---
 % Add labels showing the Leftist Property check at each node

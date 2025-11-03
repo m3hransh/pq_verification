@@ -1,0 +1,66 @@
+\begin{figure}[h!]
+\centering
+\caption{Visualization of Binomial Heap Properties}
+\label{fig:binomial-heap}
+\begin{tikzpicture}[
+    % Style for the heap nodes (circles with values)
+    heapnode/.style={circle, draw, thick, minimum size=0.5cm, font=\small},
+    % Style for the rank labels below each node
+    ranklabel/.style={above right=2pt of #1, font=\small\itshape, text=black},
+    % Style for the property check labels
+    checklabel/.style={right=2pt of #1, font=\small\color{blue!80!black}},
+    % Style for standard tree edges
+    edge/.style={draw, thick},
+    % Style for the highlighted right spine
+    % spine/.style={draw=red, very thick}
+]
+
+% --- NODES ---
+% Place the nodes of the tree manually for clarity
+\node[heapnode, color=blue] (min) {1};
+\node[heapnode, below = 1cm of min] (root) {3};
+\node[heapnode, below left=1cm and 1cm of root] (n5) {5};
+\node[heapnode, below right=1cm and 1cm of root] (n2) {2};
+\node[heapnode, below left=1cm and 0.6cm of n2] (n6) {6};
+\node[heapnode, below right=1cm and 0.6cm of n2] (n7) {7};
+\node[heapnode, below left=1cm and 0.6cm of n5] (n8) {8};
+\node[heapnode, below right=1cm and 0.6cm of n5] (n4) {4};
+
+% --- EDGES ---
+% Draw the standard parent-child connections
+\path[edge] (root) edge node[midway, above left, font=\tiny] {\(\leq\)} (n5);
+\path[edge] (n5) edge node[midway, above left, font=\tiny] {\(\leq\)} (n8);
+\path[edge] (n5) edge node[midway, above right, font=\tiny] {?} (n4);
+\path[edge] (n2) edge node[midway, above right, font=\tiny] {?} (n7);
+\path[edge] (n2) edge node[midway, above left, font=\tiny] {\(\leq\)} (n6);
+\path[edge] (root) edge node[midway, above right, font=\tiny] {?} (n2);
+\path[edge] (min) edge node[midway, above , font=\tiny] {} (root);
+
+% --- LABELS ---
+% Add rank labels below each node
+\node[ranklabel=root, text=gray] (r_root) {bin};
+% \node[ranklabel=n5] (r_n5) {rank=2};
+% \node[ranklabel=n20, below left=2pt of n20] (r_n20) {rank=1};
+% \node[ranklabel=n8] (r_n8) {rank=1};
+% \node[ranklabel=n10, below left=1pt of n10] (r_n10) {rank=1};
+% \node[ranklabel=n15] (r_n15) {rank=1};
+% \node[ranklabel=null_n10, text=gray] {rank=0};
+% \node[ranklabel=null_n20, text=gray] {rank=0};
+
+% --- PROPERTY CHECKS ---
+% Add labels showing the Leftist Property check at each node
+
+% --- LEGEND ---
+% Add a small legend to explain the diagram elements
+\node[align=left, font=\small, text width=4cm, anchor=north west] 
+    at ([xshift=1cm, yshift=2cm] current bounding box.east |- root.north) (legend){
+    \textbf{\color{blue!80!black}Minimum Property:} {\color{blue!80!black} 1 is minimum element in the pennant}
+    \vspace{0.4cm}
+    
+    \textbf{Left-ordering Property:} Parent $\le$ Left Child \\ (e.g., $3 \le 5$,  $5 \le 8$)
+    \vspace{0.4cm}
+    
+    \textbf{Perfect binary tree:} Internal perfect tree of size \(2^3 -1 \) 
+};
+\end{tikzpicture}
+\end{figure}

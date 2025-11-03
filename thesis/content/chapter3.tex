@@ -120,3 +120,161 @@ Other functions are straightforward to implement.
 
 In the chapter \ref{ch:verification}, we will verify that these implementations satisfy the priority queue interface and maintain the leftist heap invariants.
 
+\section{Binomial Heap Implementation}
+
+For our verified implementation of binomial heaps, we follow the approach of \emph{binary binomial heaps} as described by Hinze~\cite{Hinze99}. This approach represents a heap as a list of trees, analogous to a binary number, which allows for a clean and efficient implementation of the merge operation.
+
+Instead of classical binomial trees, this implementation uses \emph{pennants}.
+
+\begin{code}[caption={Pennant Data Type}, label={lst:pennant-type}]
+  data BinTree a
+    = Empty
+    | Bin { value :: a, left :: BinTree a, right :: BinTree a, height :: Int }
+
+  data Pennant a = P { root :: a, size :: Int, bin :: (BinTree a) }
+\end{code}
+
+A pennant's \texttt{size} corresponds to its height \(h\).
+The \texttt{root} holds the minimum element, and \texttt{bin} is the internal \texttt{BinTree} structure containing the other \(2^h - 1\) elements.
+
+
+There are three invariants that pennants must satisfy:
+\begin{itemize}
+    \item {\textbf{Minimum Property}: The root of the pennant is less than or equal to all other elements in the pennant.}
+    \item {\textbf{Left-ordering Property}: For every node in the internal binary tree, the value of the left child is less than or equal to the value of the right child.}
+    \item {\textbf{Perfect Binary Property}: The internal binary tree is a perfect binary tree of height \(k\), meaning all internal nodes have two children and all leaves are at the same level.}
+\end{itemize}
+
+\input{figures/binomial.tex}
+The fundamental operation on pennants is \texttt{link}, which takes two pennants of the same rank \(k\) and merges them into a single pennant of rank \(k+1\).
+The root of the new pennant is the smaller of the two original roots.
+
+\begin{code}[caption={Linking two Pennants}, label={lst:pennant-link}]
+  link :: (Ord a) => Pennant a -> Pennant a -> Pennant a
+  link p1@(P r1 k t1) p2@(P r2 _ t2)
+    | r1 <= r2  = P r1 (k + 1) (Bin r2 t2 t1 (k + 1))
+    | otherwise = P r2 (k + 1) (Bin r1 t1 t2 (k + 1))
+\end{code}
+
+A binomial heap is then represented as a list of "bits", where each bit can be either \texttt{Zero} or \texttt{One}. A \texttt{One} bit at position \(k\) signifies the presence of a pennant of rank \(k\).
+
+\begin{code}[caption={Binomial Heap Representation}, label={lst:binary-binomial-heap}]
+  data BinomialBit a =
+        Zero { rank :: Int }
+      | One  { rank :: Int, pennant :: Pennant a }
+
+  type BinomialHeap a = [BinomialBit a]
+\end{code}
+
+Merging two binomial heaps is analogous to adding two binary numbers.
+The addition is performed by a ripple-carry adder that processes the lists of bits.
+For instance, adding two \texttt{One} bits of the same rank involves linking their pennants to form a carry bit of the next higher rank.
+
+Following the ripple-carry adder approach, we define a \texttt{halfAdder} function that takes two bits and produces a sum bit and a carry bit.
+
+\begin{code}[caption={Half Adder for Binomial Bits}, label={lst:bit-half-adder}]
+  halfAdder :: (Ord a) => BinomialBit a
+                        -> BinomialBit a
+                        -> (BinomialBit a, BinomialBit a)
+  halfAdder b1 b2 = (sum b1 b2, carry b1 b2)
+\end{code}
+
+Additionally, we define a \texttt{fullAdder} function that takes two bits and an incoming carry bit, producing a sum bit and an outgoing carry bit.
+\begin{code}[caption={Full Adder for Binomial Bits}, label={lst:bit-adder}]
+  fullAdder :: (Ord a) => BinomialBit a
+                       -> BinomialBit a
+                       -> BinomialBit a
+                       -> (BinomialBit a, BinomialBit a)
+  fullAdder b1 b2 cin = 
+    let (s, c1) = halfAdder b1 b2
+        (s', c2) = halfAdder s c
+     in (s', sum c1 c2)
+\end{code}
+
+The sum and carry functions handle the logic for combining bits of the same rank according to the rules of binary addition.
+\begin{code}[caption={Sum and Carry Functions}, label={lst:bit-sum-carry}]
+  sum :: (Ord a) => BinomialBit a -> BinomialBit a -> BinomialBit a
+  sum (Zero r) (Zero _) = Zero r
+  sum (Zero r) (One _ p) = One r p
+  sum (One _ p) (Zero r) = One r p
+  sum (One r1 p1) (One r2 p2) = Zero r1
+  carry :: (Ord a) => BinomialBit a -> BinomialBit a -> BinomialBit a
+  carry (Zero r1) (Zero r2) = Zero (r1 + 1)
+  carry (Zero r1) (One _ p2) = Zero (r1 + 1)
+  carry (One _ p1) (Zero r2) = Zero (r2 + 1)
+  carry (One r1 p1) (One _ p2) = One (r1 + 1) (link p1 p2)
+
+\end{code}
+
+Finally, we can implement adding of two binomial heaps using the full adder logic.
+\begin{code}[caption={Merging Two Binomial Heaps}, label={lst:heap-merge}]
+  add :: (Ord a) => BinomialHeap a -> BinomialHeap a -> BinomialHeap a
+  add xs ys = addWithCarry xs ys (Zero 0)
+
+  addWithCarry :: (Ord a) => BinomialHeap a -> BinomialHeap a -> BinomialBit a -> BinomialHeap a
+  addWithCarry Nil Nil c
+    | c == (Zero 0) = Nil
+    | otherwise = Cons c Nil
+  addWithCarry (Cons x xs) Nil (Zero r) = Cons x xs
+  addWithCarry (Cons x xs) Nil c@(One r _) =
+    let z = Zero (rank x)
+        (s, c') = bFullAdder x z c
+     in 
+      Cons s (addWithCarry xs Nil c')
+  addWithCarry Nil (Cons y ys) c =
+    let z = Zero (rank y)
+        (s, c') = bFullAdder z y c
+      in
+        Cons s (addWithCarry Nil ys c')
+  addWithCarry (Cons x xs) (Cons y ys) c =
+    let (s, c') = bFullAdder x y c
+    in Cons s (addWithCarry xs ys c')
+
+\end{code}
+The main priority queue operations are implemented as follows:
+\begin{itemize}
+    \item {\textbf{merge}: Two heaps are merged by adding their corresponding lists of bits using the full adder logic.
+This takes \(O(\log n)\) time.
+\begin{code}[caption={Merging Two Binomial Heaps}, label={lst:heap-merge-main}]
+  merge :: (Ord a) => BinomialHeap a 
+                   -> BinomialHeap a 
+                   -> BinomialHeap a
+  merge h1 h2 = add h1 h2
+\end{code}
+}
+    \item {\textbf{insert}: A new element is treated as a pennant of rank 0.
+It is "added" to the heap, which may cause a series of carries.
+This is an \(O(\log n)\) operation, with amortized \(O(1)\) complexity.
+\begin{code}[caption={Inserting an Element into Binomial Heap}, label={lst:heap-insert}]
+  insert :: (Ord a) => a 
+                    -> BinomialHeap a 
+                    -> BinomialHeap a
+  insert x heap = merge [One 0 (P x 0 (Empty))] heap
+\end{code}
+}
+    \item {\textbf{splitMin}: This is the most involved operation. First, the pennant with the minimum root is found and removed from the list of pennants.
+Let's say it has rank \(k\). After removing the minimum element from the pennant, the perfect binary tree is then "dismantled". 
+A perfect binary tree of height \(k-1\) can be split into list of pennants of ranks \(0\) to \(k-1\).
+Removing the root leaves another binomial heaps (list of pennants), which are then merged back into the heap.
+The overall complexity is \(O(\log n)\).
+\begin{code}[caption={Splitting Minimum from Binomial Heap}, label={lst:heap-split}]
+  splitMin :: (Ord a) => BinomialHeap a -> MinView BinomialHeap a
+  splitMin heap = case extractMin heap of
+    EmptyView -> EmptyView
+    Min (Min a t) ts -> Min a (reverse (dismantle t) `add` ts)
+\end{code}
+}
+
+    \item {\textbf{findMin}: This requires finding the minimum among the roots of all pennants in the heap.
+                            Since there are at most \(\log n\) pennants, this takes \(O(\log n)\) time.}
+\begin{code}[caption={Finding Minimum in Binomial Heap}, label={lst:heap-find}]
+  findMin :: (Ord a) => BinomialHeap a -> Maybe a
+  findMin heap = case extractMin heap of
+    EmptyView -> Nothing
+    Min (Min a _) _ -> Just a
+\end{code}
+\end{itemize}
+
+This representation of binomial heaps is both elegant and well-suited for formal verification, as we will discuss in Chapter \ref{ch:verification}.
+Rather than verifying every operation, we concentrate on the merge operation, which serves as the fundamental building block from which other operations can be derived.
+
