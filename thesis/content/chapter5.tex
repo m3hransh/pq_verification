@@ -11,7 +11,7 @@ features we rely on (reflection, measures, PLE, and termination).
 \section{Shared Logical Infrastructure}
 \label{sec:shared-infra}
 
-We reuse LiquidHaskell features introduced in Chapter~\ref{chap:lh}:
+We reuse LiquidHaskell features introduced in Chapter~\ref{ch:lh}:
 \begin{itemize}
   \item \textbf{Measures and refined data types} (\S\ref{sec:reflection}--\ref{sec:lh-refined-datatypes})
         to expose structural invariants to the refinement logic.
@@ -31,14 +31,15 @@ so that lower-bound obligations can be phrased uniformly for tree- and heap-shap
 \label{sec:verify-leftist}
 The cornerstone of the verification is the refined data type for the leftist heap itself.
 We encode the core invariants of the data structure directly into its type definition.
+In LiquidHaskell notation, the refined \texttt{LeftistHeap} type is defined as follows:
 
 \begin{code}
-  data LeftistHeap a = EmptyHeap
-        | HeapNode { value :: a
-           , left  :: LeftistHeapBound a value
-           , right :: {v : LeftistHeapBound a value  | rrank v <= rrank left }
-           , rank :: {r : Nat | r == 1 + rrank right}
-          }
+data LeftistHeap a = EmptyHeap
+      | HeapNode { value :: a
+         , left  :: LeftistHeapBound a value
+         , right :: {v : LeftistHeapBound a value  | rrank v <= rrank left }
+         , rank :: {r : Nat | r == 1 + rrank right}
+        }
 \end{code}
 
 This refined definition enforces three key invariants:
@@ -47,12 +48,12 @@ This refined definition enforces three key invariants:
     This is captured by the \texttt{LeftistHeapBound a X} refinement type on the \texttt{left} and \texttt{right} children.
     \texttt{isLowerBound} is a recursively defined predicate that checks if a given value is less than or equal to all elements in a heap.
     \begin{code}
-  {-@ type LeftistHeapBound a X = { h : LeftistHeap a | isLowerBound X h} @-}
-  {-@ reflect isLowerBound @-} 
-  isLowerBound :: (Ord a) => a -> LeftistHeap a -> Bool
-  isLowerBound _ EmptyHeap = True
-  isLowerBound v (HeapNode x l r _) = 
-      v <= x && isLowerBound v l && isLowerBound v r
+{-@ type LeftistHeapBound a X = { h : LeftistHeap a | isLowerBound X h} @-}
+{-@ reflect isLowerBound @-} 
+isLowerBound :: (Ord a) => a -> LeftistHeap a -> Bool
+isLowerBound _ EmptyHeap = True
+isLowerBound v (HeapNode x l r _) = 
+    v <= x && isLowerBound v l && isLowerBound v r
     \end{code}
     
     \item \textbf{Leftist Property:} For any node, the rank of its right child is less than or equal to the rank of its left child. This is expressed by \texttt{rrank v <= rrank left}. This property is what ensures that the right spine of the heap is short, leading to logarithmic time complexity for merge operations.
@@ -62,8 +63,6 @@ This refined definition enforces three key invariants:
 
 By embedding these invariants directly into the type, \texttt{LiquidHaskell}'s verifier will ensure that any function constructing or modifying a \texttt{LeftistHeap} respects them.
 
-\subsection{Refined Heap Operations}
-\label{sec:leftist-ops}
 Following the interface defined in Chapter~\ref{lst:pq}, we refine the types of the heap operations to ensure they maintain the invariants of the leftist heap.
 Unfortunately, due to limitations in \texttt{LiquidHaskell}'s current support for type classes,
 we cannot directly define the invariants for the \texttt{PriorityQueue} type class.
@@ -84,49 +83,49 @@ This allows us to reason about their behavior during verification.
 In the following sections,
 we present the refined type signatures and implementations of the key heap operations,
 along with explanations of how they maintain the invariants of the leftist heap.
-\subsubsection{Heap isEmpty}
+\subsection{Heap isEmpty}
 This function checks if the heap is empty.
 There is no invariate to maintain here, but we define a measure to help with other proofs.
 \begin{code}
-  {-@ measure heapIsEmpty @-}
-  {-@ heapIsEmpty :: LeftistHeap a -> Bool @-}
-  heapIsEmpty :: (Ord a) => LeftistHeap a -> Bool
-  heapIsEmpty EmptyHeap = True
-  heapIsEmpty _ = False
+{-@ measure heapIsEmpty @-}
+{-@ heapIsEmpty :: LeftistHeap a -> Bool @-}
+heapIsEmpty :: (Ord a) => LeftistHeap a -> Bool
+heapIsEmpty EmptyHeap = True
+heapIsEmpty _ = False
 \end{code}
-\subsubsection{Heap findMin}
+\subsection{Heap findMin}
 To retrieve the minimum element from a non-empty heap, we define \texttt{heapFindMin}.
 We restrict its input to non-empty heaps and specify that the returned value is a lower bound for the heap.
 As per the heap property, the minimum element is always at the root of the heap.
 This can directly be extracted from the \texttt{HeapNode} and \texttt{LiquidHaskell} can verify that this value is indeed a lower bound for the entire heap.
 \begin{code}
-  {-@ heapFindMin :: h : {h : LeftistHeap a | not (heapIsEmpty h)} 
-        -> {v : a | isLowerBound v h} @-}
-  heapFindMin :: (Ord a) => LeftistHeap a -> a
-  heapFindMin (HeapNode x _ _ _) = x
+{-@ heapFindMin :: h : {h : LeftistHeap a | not (heapIsEmpty h)} 
+      -> {v : a | isLowerBound v h} @-}
+heapFindMin :: (Ord a) => LeftistHeap a -> a
+heapFindMin (HeapNode x _ _ _) = x
 \end{code}
 
-\subsubsection{Heap Merge}
+\subsection{Heap Merge}
 The most critical operation for a leftist heap is \texttt{heapMerge}. 
 Its correctness is fundamental to the correctness of \texttt{insert} and \texttt{deleteMin}.
 The type signature for \texttt{heapMerge} specifies its behavior:
 \begin{code}
-  heapMerge :: h1 : LeftistHeap a 
-        -> h2: LeftistHeap a 
-        -> {h : LeftistHeap a | (HeapMergeMin h1 h2 h) 
-                             && (BagUnion h1 h2 h)}
-        / [size h1, size h2, 0]
+heapMerge :: h1 : LeftistHeap a 
+      -> h2: LeftistHeap a 
+      -> {h : LeftistHeap a | (HeapMergeMin h1 h2 h) 
+                           && (BagUnion h1 h2 h)}
+      / [size h1, size h2, 0]
 \end{code}
 This signature guarantees that merging two valid leftist heaps results in a new valid leftist heap,
 that the heap property is maintained, and that the set of elements is preserved.
 
 To express these properties, we have defined two predicates:
 \begin{code}
- predicate HeapMergeMin H1 H2 H = 
-    ((not (heapIsEmpty H1) && not (heapIsEmpty H2)) => 
-    isLowerBound (min (heapFindMin H1) (heapFindMin H2)) H )
- predicate BagUnion H1 H2 H = 
-    (bag H == B.union (bag H1) (bag H2))
+predicate HeapMergeMin H1 H2 H = 
+  ((not (heapIsEmpty H1) && not (heapIsEmpty H2)) => 
+  isLowerBound (min (heapFindMin H1) (heapFindMin H2)) H )
+predicate BagUnion H1 H2 H = 
+  (bag H == B.union (bag H1) (bag H2))
 \end{code}
 
 \texttt{HeapMergeMin} asserts that the resulting heap \texttt{H} respects the heap property relative to the minimum elements of the input heaps \texttt{H1} and \texttt{H2}.
@@ -140,19 +139,18 @@ We must provide the proof for \texttt{LiquidHaskell} that the root value \texttt
 
 \begin{code}
 heapMerge h1@(HeapNode x1 l1 r1 _) h2@(HeapNode x2 l2 r2 _)
-  | x1 <= x2 = makeHeapNode x1 l1 ((heapMerge r1 h2) 
-    `withProof` lemma_merge_case1 x1 x2 r1 h2)
-  | otherwise = makeHeapNode x2 l2 ((heapMerge h1 r2)
-    `withProof` lemma_heapMerge_case2 x2 x1 r2 h1)
+| x1 <= x2 = makeHeapNode x1 l1 ((heapMerge r1 h2) 
+  `withProof` lemma_merge_case1 x1 x2 r1 h2)
+| otherwise = makeHeapNode x2 l2 ((heapMerge h1 r2)
+  `withProof` lemma_heapMerge_case2 x2 x1 r2 h1)
 \end{code}
 
 The \texttt{makeHeapNode} requires that its first argument is a lower bound for both its left and right children.
 \begin{code}
-  makeHeapNode :: x : a
-   -> {h : LeftistHeap a | isLowerBound x h}
-   -> {h : LeftistHeap a | isLowerBound x h}
-   -> {h : LeftistHeap a | isLowerBound x h}
-
+makeHeapNode :: x : a
+ -> {h : LeftistHeap a | isLowerBound x h}
+ -> {h : LeftistHeap a | isLowerBound x h}
+ -> {h : LeftistHeap a | isLowerBound x h}
 \end{code}
 In this context, \texttt{LiquidHaskell} can automatically infer that the root value (\texttt{x1} or \texttt{x2}) is a lower bound for the left child, since it is inherited from the parent heap.
 However, for the right child, which is obtained from a recursive call to \texttt{heapMerge}, the proof must be supplied explicitly.
@@ -161,27 +159,27 @@ This proof obligation is discharged by auxiliary lemmas such as \texttt{lemma\_m
 The first lemma, \texttt{lemma\_merge\_case1}, handles the case where \texttt{x1 <= x2}.
 It states that if \texttt{x1} is a lower bound for \texttt{r1} and \texttt{x2} is a lower bound for \texttt{h2}, then \texttt{x1} is also a lower bound for the result of merging \texttt{r1} and \texttt{h2}.
 \begin{code}
-  lemma_merge_case1 :: x1 : a
-    -> x2 : {a |  x1  <= x2}
-    -> r1 : LeftistHeapBound a x1
-    -> h2 : {LeftistHeapBound a x2 | not (heapIsEmpty h2)}
-    -> {isLowerBound x1 (heapMerge r1 h2)}
-    / [size r1, size h2, 1]
+lemma_merge_case1 :: x1 : a
+  -> x2 : {a |  x1  <= x2}
+  -> r1 : LeftistHeapBound a x1
+  -> h2 : {LeftistHeapBound a x2 | not (heapIsEmpty h2)}
+  -> {isLowerBound x1 (heapMerge r1 h2)}
+  / [size r1, size h2, 1]
 \end{code}
 
 The proof proceeds by case analysis on the structure of \texttt{r1}.
 
 \begin{code}
-  lemma_merge_case1 x1 x2 EmptyHeap h2 =
-    isLowerBound x1 (heapMerge EmptyHeap h2)
-      ? lemma_isLowerBound_transitive x1 x2 h2
-      *** QED
-  lemma_merge_case1 x1 x2 r1@(HeapNode _ _ _ _) h2@(HeapNode _ _ _ _) =
-    isLowerBound x1 (heapMerged)
-      ? (lemma_isLowerBound_transitive x1 (min (heapFindMin r1) (heapFindMin h2)) (heapMerged))
-      *** QED
-   where
-    heapMerged = heapMerge r1 h2
+lemma_merge_case1 x1 x2 EmptyHeap h2 =
+  isLowerBound x1 (heapMerge EmptyHeap h2)
+    ? lemma_isLowerBound_transitive x1 x2 h2
+    *** QED
+lemma_merge_case1 x1 x2 r1@(HeapNode _ _ _ _) h2@(HeapNode _ _ _ _) =
+  isLowerBound x1 (heapMerged)
+    ? (lemma_isLowerBound_transitive x1 (min (heapFindMin r1) (heapFindMin h2)) (heapMerged))
+    *** QED
+ where
+  heapMerged = heapMerge r1 h2
 \end{code}
 
 In the base case, when \texttt{r1} is empty, the merge simply returns \texttt{h2}.
@@ -190,7 +188,7 @@ In the inductive case, both heaps are non-empty.
 The result of \texttt{heapMerge r1 h2} again satisfies the lower-bound property, which is established through the transitive lemma below.
 
 
-\subsubsection*{Transitivity of Lower Bounds}
+\subsubsection{Transitivity of Lower Bounds}
 The lemma \texttt{lemma\_isLowerBound\_transitive} expresses the fundamental transitivity of the lower-bound relation across heaps.
 It is used repeatedly throughout the verification of heap merge.
 \begin{code}
@@ -199,7 +197,11 @@ It is used repeatedly throughout the verification of heap merge.
       -> h : {h : LeftistHeap a | isLowerBound y h}
       -> {isLowerBound x h}
 @-}
-lemma_isLowerBound_transitive :: (Ord a) => a -> a -> LeftistHeap a -> Proof
+lemma_isLowerBound_transitive :: 
+  (Ord a) => a
+          -> a
+          -> LeftistHeap a
+          -> Proof
 lemma_isLowerBound_transitive x y EmptyHeap = ()
 lemma_isLowerBound_transitive x y (HeapNode z l r _) = lemma_isLowerBound_transitive x y l &&& lemma_isLowerBound_transitive x y r *** QED
 \end{code}
@@ -207,23 +209,23 @@ lemma_isLowerBound_transitive x y (HeapNode z l r _) = lemma_isLowerBound_transi
 This lemma formalizes the intuitive notion that if \texttt{x <= y} and \texttt{y} is a lower bound for all elements of a heap \texttt{h}, then \texttt{x} must also be a lower bound for \texttt{h}.
 It is a small but essential proof component that supports most of the recursive heap reasoning.
 
-\subsubsection*{Symmetric Case}
+\subsubsection{Symmetric Case}
 A symmetric argument applies to the case where \texttt{x1 > x2}.
 The second lemma, \texttt{lemma\_merge\_case2}, follows the same structure as \texttt{lemma\_merge\_case1} but exchanges the roles of the input heaps and their bounds.
 
 \begin{code}
-  lemma_heapMerge_case2 :: x2 : a
-    -> x1 : { v : a |  x2  <= v}
-    -> r1 : {h : LeftistHeap a | isLowerBound x2 h}
-    -> h2 : {h : LeftistHeap a | not (heapIsEmpty h) && isLowerBound x1 h}
-    -> {isLowerBound x2 (heapMerge h2 r1)} 
-    / [size h2, size r1, 1]
+lemma_heapMerge_case2 :: x2 : a
+  -> x1 : { v : a |  x2  <= v}
+  -> r1 : {h : LeftistHeap a | isLowerBound x2 h}
+  -> h2 : {h : LeftistHeap a | not (heapIsEmpty h) && isLowerBound x1 h}
+  -> {isLowerBound x2 (heapMerge h2 r1)} 
+  / [size h2, size r1, 1]
 \end{code}
 The reason we cannot simply reuse \texttt{lemma\_merge\_case1} is that the order of the arguments to \texttt{heapMerge} is swapped in this case.
 And also the termination metric must reflect which arguments are reduced in the recursive call.
 We discuss this in the next section.
 
-\subsubsection*{Dealing with Termination and Recursion}
+\subsubsection{Dealing with Termination and Recursion}
 
 \texttt{LiquidHaskell} must ensure that all recursive functions terminate. 
 For \texttt{heapMerge}, we provide the following termination metric:
@@ -255,7 +257,7 @@ In the same way, other supporting lemmas are also assigned termination metrics, 
 
 Together, these lemmas ensure that \texttt{heapMerge} preserves the heap property and terminates correctly for all valid inputs.
 They form the core of the mechanized proof that merging two leftist heaps yields a well-formed, correctly ordered, and element-preserving result.
-\subsubsection{Heap Insert}
+\subsection{Heap Insert}
 Heap insertion is implemented using heap merging.
 The refined type signature for \texttt{heapInsert} specifies that
 inserting an element into a non-empty heap produces a new heap where
@@ -274,7 +276,7 @@ LiquidHaskell can automatically verify that the properties hold, given the corre
 So no additional lemmas are required here.
 
 
-\subsubsection{Heap SplitMin}
+\subsection{Heap SplitMin}
 
 The \texttt{SplitMin} operation decomposes a heap into its minimum element and the remaining heap. 
 If the heap is empty, the result is an empty view. 
@@ -438,24 +440,24 @@ bCarry:: b1:{b:BinomialBit a | rank b >= 0}
 \end{code}
 \texttt{bSum} produces a bit of the same rank, while \texttt{bCarry} produces a carry bit of the next higher rank. These are composed into a full-adder, which also guarantees correct output ranks for its sum and carry bits.
 \begin{code}
-  bFullAdder :: b1:BinomialBit a
-      -> b2:{b:BinomialBit a | rank b == rank b1}
-      -> c:{b:BinomialBit a | rank b == rank b1}
-      -> (BinomialBit a, BinomialBit a)
-          <{\s co -> rank s == rank b1 && rank co == rank b1 + 1}> 
+bFullAdder :: b1:BinomialBit a
+    -> b2:{b:BinomialBit a | rank b == rank b1}
+    -> c:{b:BinomialBit a | rank b == rank b1}
+    -> (BinomialBit a, BinomialBit a)
+        <{\s co -> rank s == rank b1 && rank co == rank b1 + 1}> 
 \end{code}
 These rank-preserving properties are essential for the main merge algorithm, \texttt{addWithCarry}, to produce a valid \texttt{BinomialHeap}.
 
 \subsection{Heap Merging with \texttt{addWithCarry}}
 The function \texttt{addWithCarry} implements the ripple-carry addition recursively over the lists of bits. Its refined type is complex, mainly to ensure that the carry bit passed between recursive calls has the expected rank.
 \begin{code}
-  addWithCarry :: h1:BinomialHeap a
-      -> h2:{BinomialHeap a | (bRank h2 == bRank h1 || isNil h1) 
-                              || isNil h2}
-      -> carry:{c:BinomialBit a | ((not isNil h1) => rank carry == bRank h1)
-                                && ((not isNil h2) => rank carry == bRank h2)}
-      -> {b:BinomialHeap a | ...} 
-      / [len h1, len h2, 0]
+addWithCarry :: h1:BinomialHeap a
+    -> h2:{BinomialHeap a | (bRank h2 == bRank h1 || isNil h1) 
+                            || isNil h2}
+    -> carry:{c:BinomialBit a | ((not isNil h1) => rank carry == bRank h1)
+                              && ((not isNil h2) => rank carry == bRank h2)}
+    -> {b:BinomialHeap a | ...} 
+    / [len h1, len h2, 0]
 \end{code}
 The key properties verified by LiquidHaskell are:
 \begin{itemize}

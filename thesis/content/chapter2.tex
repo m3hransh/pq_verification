@@ -53,7 +53,7 @@ Type-level computation is employed to enable rigorous reasoning about the termin
 This approach requires users to provide lemmas or rewrite hints to assist in proving properties within decidable theories \cite{vazou2018}.
 
 In \textbf{Coq}, data structures are commonly verified using a model-based approach.
-The process involves defining a logical model---a multiset of elements, represented as a list where order is proven irrelevant---and then proving that a concrete implementation correctly simulates the abstract operations on the multiset \cite{VerifiedFunctional}.
+The process involves defining a logical model, a multiset of elements, represented as a list where order is proven irrelevant, and then proving that a concrete implementation correctly simulates the abstract operations on the multiset \cite{VerifiedFunctional}.
 This involves defining the data structure, its representation invariants, and its operations within Coq's logic (the Calculus of Inductive Constructions), and then interactively proving the correspondence using tactics.
 While this method is powerful for ensuring correctness, it can be labor-intensive and require significant expertise in formal methods.
 

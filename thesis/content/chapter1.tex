@@ -45,7 +45,7 @@ the correctness of priority queue implementations.
 
 % TODO: This should be change if I add other implementation
 The key contributions are as follows.
-First, we implement a priority queue variant, \emph{Leftist Heap}, in Haskell.
+First, we implement two different priority queue variants, \emph{Leftist Heaps} and \emph{Binomial Heaps}, in Haskell.
 Second, we encode structural and behavioral invariants using refinement types in \texttt{LiquidHaskell}.
 Third, we demonstrate the verification of correctness properties directly in Haskell with minimal annotation.
 Finally, we evaluate the ease, limitations, and effort required in this approach compared to traditional theorem provers.
@@ -60,12 +60,14 @@ The rest of this thesis is structured as follows:
 	\item \textbf{Chapter 2} provides background on functional data structures,
 	      priority queues, and program verification techniques, along with
 	      related work.
-	\item \textbf{Chapter 3} describes the design and implementation of \emph{Leftist Heap} in Haskell.
+	\item \textbf{Chapter 3} describes the design and implementation of \emph{Leftist Heaps} and \emph{Binomial Heaps} in Haskell.
 	\item \textbf{Chapter 4} introduces \texttt{LiquidHaskell}, its syntax,
 	      verification pipeline, and its strengths and limitations.
 	\item \textbf{Chapter 5} demonstrates the verification of priority queue
 	      operations using \texttt{LiquidHaskell}, including encoding invariants,
 	      use of refinement types, and example proofs.
+	\item \textbf{Chapter 6} concludes the thesis by summarizing the findings,
+	        discussing limitations, and suggesting directions for future work.
 	\item \textbf{Appendices} contain the complete verified code and additional
 	      implementation insights.
 \end{itemize}
