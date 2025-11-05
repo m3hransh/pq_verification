@@ -34,12 +34,13 @@ We encode the core invariants of the data structure directly into its type defin
 In LiquidHaskell notation, the refined \texttt{LeftistHeap} type is defined as follows:
 
 \begin{code}
-data LeftistHeap a = EmptyHeap
-      | HeapNode { value :: a
-         , left  :: LeftistHeapBound a value
-         , right :: {v : LeftistHeapBound a value  | rrank v <= rrank left }
-         , rank :: {r : Nat | r == 1 + rrank right}
-        }
+data LeftistHeap a 
+  = EmptyHeap
+  | HeapNode { value :: a
+             , left  :: LeftistHeapBound a value
+             , right :: {v : LeftistHeapBound a value  | rrank v <= rrank left }
+             , rank :: {r : Nat | r == 1 + rrank right}
+             }
 \end{code}
 
 This refined definition enforces three key invariants:
@@ -69,14 +70,14 @@ we cannot directly define the invariants for the \texttt{PriorityQueue} type cla
 Instead, we provide refined type signatures for each operation individually.
 To express these invariants and reason about the behavior of our functions, we use several features of \texttt{LiquidHaskell}.
 
-\textbf{Measures} (see Section~\ref{sec:reflection}) are functions from Haskell's term-level to the refinement logic's domain. We define several measures:
+\textbf{Measures} (see \S\ref{sec:reflection}) are functions from Haskell's term-level to the refinement logic's domain. We define several measures:
 \begin{itemize}
-	\item \texttt{size}: Computes the total number of nodes in the heap, useful for termination metrics (see Section~\ref{sec:termination}).
+	\item \texttt{size}: Computes the total number of nodes in the heap, useful for termination metrics (see \S\ref{sec:termination}).
 	\item \texttt{rrank}: Returns the rank of a heap, which is crucial for the leftist property.
 	\item \texttt{bag}: Converts the heap into a multiset (or bag) of its elements. This is invaluable for proving that operations like \texttt{heapMerge} do not lose or duplicate elements.
 \end{itemize}
 
-\textbf{Reflected Functions} (see Section~\ref{sec:reflection}) allow us to use standard Haskell functions within the refinement logic. We use this for \texttt{isLowerBound}, \texttt{heapMerge}, and \texttt{makeHeapNode}.
+\textbf{Reflected Functions} (see \S\ref{sec:reflection}) allow us to use standard Haskell functions within the refinement logic. We use this for \texttt{isLowerBound}, \texttt{heapMerge}, and \texttt{makeHeapNode}.
 This allows us to reason about their behavior during verification.
 
 
@@ -111,10 +112,9 @@ Its correctness is fundamental to the correctness of \texttt{insert} and \texttt
 The type signature for \texttt{heapMerge} specifies its behavior:
 \begin{code}
 heapMerge :: h1 : LeftistHeap a 
-      -> h2: LeftistHeap a 
-      -> {h : LeftistHeap a | (HeapMergeMin h1 h2 h) 
-                           && (BagUnion h1 h2 h)}
-      / [size h1, size h2, 0]
+  -> h2 : LeftistHeap a 
+  -> {h : LeftistHeap a | (HeapMergeMin h1 h2 h) && (BagUnion h1 h2 h)}
+  / [size h1, size h2, 0]
 \end{code}
 This signature guarantees that merging two valid leftist heaps results in a new valid leftist heap,
 that the heap property is maintained, and that the set of elements is preserved.
@@ -351,30 +351,46 @@ We deliberately \emph{omit} proofs for \texttt{findMin} and \texttt{splitMin} at
 \label{sec:binomial-pennant}
 
 We model the pennant as a root key with an internal perfect tree (the ``bin'')
-that holds the remaining elements. We expose its height to the logic and
+that holds the remaining elements following Listing \ref{lst:pennant-type}. We expose its height to the logic and
 assert the lower-bound property at every node. In LiquidHaskell notation:
 \begin{code}
 type BinTreeBound a X = {b : BinTree a | isLowerBound X b}
 data BinTree a = Empty
-      | Bin { value :: a
-          ,left  :: BinTreeBound a value
-          ,right :: BinTreeHeight a (bheight left)
-          ,height :: {h : Nat | h == 1 + bheight right}
-           }
+      | Bin { value  :: a
+            , left   :: BinTreeBound a value
+            , right  :: BinTreeHeight a (bheight left)
+            , height :: {h : Nat | h == 1 + bheight right}
+            }
 \end{code}
-The refined \texttt{Pennant} type asserts that the internal tree is a lower-bounded
-perfect tree of the advertised size:
+\texttt{bheight} is a measure that computes the height of a \texttt{BinTree}:
 \begin{code}
-data Pennant a = P { root :: a
-           ,size  :: Nat
-           ,bin   :: {b : BinTreeBound a root | bheight b == size}
-           }
+
+{-@ measure bheight @-}
+{-@ bheight :: BinTree a -> {v: Int | v >= -1} @-}
+bheight :: BinTree a -> Int
+bheight Empty = -1
+bheight (Bin _ _ _ h) = h
+\end{code}
+
+The refined \texttt{Pennant} type asserts that the internal tree is a lower-bounded
+perfect tree of the advertised height:
+\begin{code}
+data Pennant a 
+  = P 
+  { root    :: a
+  , pheight :: Nat
+  , bin     :: {b : BinTreeBound a root | bheight b + 1 = pheight}
+  }
 \end{code}
 These refined data types directly encode the invariants for pennants described in Chapter~\ref{ch:impl}:
 \begin{itemize}
     \item {\textbf{Minimum Property}:} The refinement on the \texttt{bin} field, \texttt{\{b:BinTreeBound a root | ...\}}, ensures that the pennant's \texttt{root} is a lower bound for all elements in its internal tree \texttt{bin}. This is because \texttt{BinTreeBound a root} is an alias for \texttt{\{h : BinTree a | isLowerBound root h\}}.
 
-    \item {\textbf{Perfect Binary Property}:} The structure of \texttt{BinTree} guarantees that it is a perfect binary tree. The refinement \texttt{right :: BinTreeHeight a (bheight left)} enforces that the left and right children of any node have the same height (\texttt{bheight left == bheight right}). The rank of a node is then one greater than its children's height, which is the definition of a perfect binary tree. The \texttt{bheight b == size} check in the \texttt{Pennant} type connects the pennant's size to the height of its internal tree.
+    \item {\textbf{Perfect Binary Property}: 
+            The structure of \texttt{BinTree} guarantees that it is a perfect binary tree.
+            The refinement \texttt{right :: BinTreeHeight a (bheight left)} enforces that the left and right children of any node have the same height (\texttt{bheight left == bheight right}).
+            The height of a node is then one greater than its children's height, which is the definition of a perfect binary tree.
+            The \texttt{bheight b + 1 = pheight} check in the \texttt{Pennant} type connects the pennant's height to the height of its internal tree.}
 
     \item {\textbf{Internal Heap Property}:} Chapter~\ref{ch:impl} describes a \emph{Left-ordering Property}. Our verified implementation uses a standard heap property within the internal \texttt{BinTree} instead. The refinement \texttt{left :: BinTreeBound a value} on the \texttt{Bin} constructor requires that a node's \texttt{value} is a lower bound for its own \texttt{left} subtree. This is a sufficient condition for the correctness of the \texttt{merge} operation on pennants.
 \end{itemize}
@@ -384,26 +400,28 @@ These refined data types directly encode the invariants for pennants described i
 \subsubsection{Singleton Pennant}
 Creating a singleton pennant, which represents a single element, is a simple operation. The refined type ensures that it correctly forms a pennant of size 0.
 \begin{code}
-{-@ singleton :: Ord a => a -> {v:Pennant a | psize v == 0} @-}
+{-@ singleton :: Ord a => a -> {v : Pennant a | pheight v == 0} @-}
 singleton :: (Ord a) => a -> Pennant a
 singleton x = P x 0 Empty
 \end{code}
 The implementation creates a pennant with the given element \texttt{x} as the root, a size of 0, and an \texttt{Empty} tree as its \texttt{bin}. LiquidHaskell verifies this is valid because \texttt{bheight Empty} is 0, and \texttt{isLowerBound x Empty} is trivially true.
 
 \subsubsection{Link Pennants}
-The core operation on pennants is merging two pennants of the same size \(k\) into one of size \(k+1\).
-The refined signature guarantees the size increase and, more importantly, that the resulting pennant preserves the invariants.
+The core operation on pennants is merging two pennants of the same height \(h\) into one of height \(h+1\).
+The refined signature guarantees the height increase, ensures that all elements of the merging pennants exist, and, more importantly, that the resulting pennant preserves the invariants.
 \begin{code}
 {-@ reflect link @-}
-{-@ link :: Ord a => t1:Pennant a
-    -> t2:{t:Pennant a | psize t == psize t1}
-    -> {v:Pennant a | psize v == psize t1 + 1} @-}
+{-@ link :: Ord a => t1 : Pennant a
+    -> t2 : {Pennant a | pheight t2 == pheight t1}
+    -> {v : Pennant a | pheight v == pheight t1 + 1 && BagUnion t1 t2 v} @-}
 link :: (Ord a) => Pennant a -> Pennant a -> Pennant a
-link (P x1 s1 t1) (P x2 s2 t2)
-  | x1 <= x2 = P x1 (s1 + 1) (Bin x2 t2 t1 (bheight t1 + 1))
-      `withProof` lemma_isLowerBound_transitive x1 x2 t2
-  | otherwise = P x2 (s1 + 1) (Bin x1 t1 t2 (s1 + 1))
-      `withProof` lemma_isLowerBound_transitive x2 x1 t1
+link (P x1 h1 t1) (P x2 h2 t2)
+  | x1 <= x2 
+    = P x1 (h1 + 1) (Bin x2 t2 t1 (h1))
+       `withProof` lemma_isLowerBound_transitive x1 x2 t2
+  | otherwise 
+    = P x2 (h1 + 1) (Bin x1 t1 t2 (h1))
+       `withProof` lemma_isLowerBound_transitive x2 x1 t1
 \end{code}
 The implementation chooses the smaller of the two roots (\texttt{x1} or \texttt{x2}) as the new root. The other pennant's root and tree are used to form a new \texttt{BinTree} node that becomes the \texttt{bin} of the resulting pennant.
 
@@ -420,29 +438,32 @@ The merge operation for binomial heaps is analogous to binary addition. The heap
 
 Each bit is tagged with its rank (or order).
 \begin{code}
-data BinomialBit a =
-      Zero { zorder :: Nat }
-    | One  { oorder :: Nat, pennant :: {p:Pennant a | psize p == oorder}}
+data BinomialBit a 
+  = Zero { zorder :: Nat }
+  | One  { oorder :: Nat
+         , pennant :: {p : Pennant a | pheight p == oorder}
+         }
 \end{code}
 A \texttt{BinomialHeap} is a list of these bits, with ranks strictly increasing by one at each step. This is enforced by a refined \texttt{PList} type from LiquidHaskell's prelude.
 \begin{code}
-type BinomialHeap a = PList <{\hd v -> rank hd == rank v - 1}> (BinomialBit a)
+type BinomialHeap a 
+  = PList <{\hd v -> rank hd == rank v - 1}> (BinomialBit a)
 \end{code}
 
 The adder logic is built from \texttt{bSum} and \texttt{bCarry} functions, which are combined into half-adders and full-adders. Their refined types guarantee rank-correctness.
 \begin{code}
-bSum:: b1:BinomialBit a -> b2:{b:BinomialBit a | rank b == rank b1}
-         -> {b:BinomialBit a | rank b == rank b1}
+bSum :: b1 : BinomialBit a -> b2 : {BinomialBit a | rank b2 == rank b1}
+         -> {b : BinomialBit a | rank b == rank b1}
 
-bCarry:: b1:{b:BinomialBit a | rank b >= 0}
-          -> b2:{b:BinomialBit a | rank b == rank b1}
-          -> {b:BinomialBit a | rank b == rank b1 + 1}
+bCarry :: b1 : {BinomialBit a | rank b1 >= 0}
+          -> b2 : {BinomialBit a | rank b2 == rank b1}
+          -> {b : BinomialBit a | rank b == rank b1 + 1}
 \end{code}
 \texttt{bSum} produces a bit of the same rank, while \texttt{bCarry} produces a carry bit of the next higher rank. These are composed into a full-adder, which also guarantees correct output ranks for its sum and carry bits.
 \begin{code}
 bFullAdder :: b1:BinomialBit a
-    -> b2:{b:BinomialBit a | rank b == rank b1}
-    -> c:{b:BinomialBit a | rank b == rank b1}
+    -> b2 : {BinomialBit a | rank b2 == rank b1}
+    -> c: {BinomialBit a | rank c == rank b1}
     -> (BinomialBit a, BinomialBit a)
         <{\s co -> rank s == rank b1 && rank co == rank b1 + 1}> 
 \end{code}
@@ -450,15 +471,19 @@ These rank-preserving properties are essential for the main merge algorithm, \te
 
 \subsection{Heap Merging with \texttt{addWithCarry}}
 The function \texttt{addWithCarry} implements the ripple-carry addition recursively over the lists of bits. Its refined type is complex, mainly to ensure that the carry bit passed between recursive calls has the expected rank.
+
 \begin{code}
-addWithCarry :: h1:BinomialHeap a
-    -> h2:{BinomialHeap a | (bRank h2 == bRank h1 || isNil h1) 
-                            || isNil h2}
-    -> carry:{c:BinomialBit a | ((not isNil h1) => rank carry == bRank h1)
-                              && ((not isNil h2) => rank carry == bRank h2)}
-    -> {b:BinomialHeap a | ...} 
-    / [len h1, len h2, 0]
+addWithCarry :: h1 : BinomialHeap a
+  -> h2 : {BinomialHeap a | 
+            ( bRank h2 == bRank h1 || isNil h1) 
+            || isNil h2
+          }
+  -> carry : {BinomialBit a | ((not isNil h1) => rank carry == bRank h1)
+                            && ((not isNil h2) => rank carry == bRank h2)}
+  -> {b : BinomialHeap a | ...} 
+  / [len h1, len h2, 0]
 \end{code}
+
 The key properties verified by LiquidHaskell are:
 \begin{itemize}
     \item \textbf{Termination:} The function terminates, which is guaranteed by the lexicographic metric \texttt{/ [len h1, len h2, 0]}, as each recursive call consumes at least one of the input lists.
