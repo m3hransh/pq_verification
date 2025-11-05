@@ -1,0 +1,277 @@
+module PriorityQueue.BinomialHeap where
+
+import Control.Arrow (Arrow (second))
+import qualified Language.Haskell.Liquid.Bag as B
+import Language.Haskell.Liquid.ProofCombinators
+import Prelude hiding (max, sum)
+
+{-@ LIQUID "--reflection" @-}
+{-@ LIQUID "--ple" @-}
+
+{-@ reflect max @-}
+{-@ max:: forall <p :: Int -> Bool> . Int <p> -> Int<p> -> Int<p> @-}
+max :: Int -> Int -> Int
+max x y = if x > y then x else y
+
+-- Binary tree with heap property
+{-@ reflect isLowerBound @-}
+{-@ isLowerBound :: Ord a => v:a -> t:BinTree a -> Bool @-}
+isLowerBound :: (Ord a) => a -> BinTree a -> Bool
+isLowerBound _ Empty = True
+isLowerBound v (Bin x l r _) = v <= x && isLowerBound v l && isLowerBound v r
+
+{-@ lemma_isLowerBound_transitive :: x:a -> y:{a | x <= y} -> t:{BinTree a | isLowerBound y t} -> {isLowerBound x t} @-}
+lemma_isLowerBound_transitive ::
+  (Ord a) => a -> a -> BinTree a -> Proof
+lemma_isLowerBound_transitive x y Empty = ()
+lemma_isLowerBound_transitive x y (Bin z l r _) =
+  lemma_isLowerBound_transitive x y l
+    &&& lemma_isLowerBound_transitive x y r
+
+{-@ type BinTreeHeight a H = { t : BinTree a | bheight t == H } @-}
+
+{-@ type BinTreeBound a X = {b : BinTree a | isLowerBound X b} @-}
+{-@ data BinTree a = Empty
+      | Bin { value :: a
+          ,left  :: BinTreeBound a value
+          ,right :: BinTreeHeight a (bheight left)
+          ,height :: {h : Nat | h == 1 + bheight right}
+           }
+  @-}
+data BinTree a
+  = Empty
+  | Bin
+      { value :: a
+      , left :: BinTree a
+      , right :: BinTree a
+      , height :: Int
+      }
+  deriving (Show, Eq)
+
+{-@ measure treeHeight @-}
+treeHeight :: BinTree a -> Int
+treeHeight Empty = 0
+treeHeight (Bin _ l r _) = 1 + max (treeHeight l) (treeHeight r)
+
+{-@ invariant {t:BinTree a | height t = treeHeight t} @-}
+
+{-@ measure bheight @-}
+{-@ bheight :: BinTree a -> {v: Int | v >= -1} @-}
+bheight :: BinTree a -> Int
+bheight Empty = -1
+bheight (Bin _ _ _ h) = h
+
+{-@ data Pennant a = P { root :: a
+           ,pheight  :: Nat
+           ,bin   :: {b : BinTreeBound a root | bheight b + 1 = pheight}
+           }
+  @-}
+data Pennant a
+  = P
+  { root :: a
+  , pheight :: Int
+  , bin :: (BinTree a)
+  }
+  deriving (Show, Eq)
+
+pennantExample :: Pennant Int
+pennantExample = P 3 2 (Bin 4 (Bin 7 Empty Empty 0) (Bin 3 Empty Empty 0) 1)
+
+{-@ singleton :: Ord a => a -> {v:Pennant a | pheight v == 0} @-}
+singleton :: (Ord a) => a -> Pennant a
+singleton x = P x 0 Empty
+
+{-@ measure isEmpty @-}
+{-@ isEmpty :: Pennant a -> Bool @-}
+isEmpty :: Pennant a -> Bool
+isEmpty _ = False
+
+{-@reflect bag @-}
+{-@ bag :: BinTree a -> Bag a @-}
+bag :: BinTree a -> B.Bag a
+bag Empty = B.empty
+bag (Bin a l r _) = B.put a (B.union (bag l) (bag r))
+
+{-@reflect pBag @-}
+{-@ pBag :: Pennant a -> Bag a @-}
+pBag :: Pennant a -> B.Bag a
+pBag (P a _ bt) = B.put a (bag bt)
+
+{-@ predicate BagUnion H1 H2 H = (pBag H == B.union (pBag H1) (pBag H2)) @-}
+
+{-@reflect link @-}
+{-@ link :: Ord a => t1: Pennant a -> t2: {t : Pennant a | pheight t == pheight t1} -> {v: Pennant a| pheight v == pheight t1 + 1 && BagUnion t1 t2 v} @-}
+link :: (Ord a) => Pennant a -> Pennant a -> Pennant a
+link (P x1 s1 t1) (P x2 s2 t2)
+  | x1 <= x2 = (P x1 (s1 + 1) ((Bin x2 t2 t1 (s1)) `withProof` (lemma_isLowerBound_transitive x1 x2 t2)))
+  | otherwise = (P x2 (s1 + 1) ((Bin x1 t1 t2 (s1)) `withProof` lemma_isLowerBound_transitive x2 x1 t1))
+
+{-@ data PList a < p :: a -> a -> Bool> =
+        Nil
+      | Cons { phd :: a, ptl :: PList < p >  a < p phd > }  @-}
+data PList a
+  = Nil
+  | Cons a (PList a)
+
+{-@ measure len @-}
+{-@ len :: PList a -> Nat @-}
+len :: PList a -> Int
+len Nil = 0
+len (Cons _ t) = 1 + len t
+
+{-@ measure bhsize @-}
+{-@ bhsize :: PList a -> Nat @-}
+bhsize :: PList a -> Int
+bhsize Nil = 0
+bhsize (Cons h t) = 1 + bhsize t
+
+{-@ data BinomialBit a =
+        Zero { zorder :: Nat }
+      | One  {  oorder :: Nat, pennant :: {p : Pennant a | pheight p == oorder}}  @-}
+data BinomialBit a
+  = Zero Int
+  | One Int (Pennant a)
+  deriving (Show, Eq)
+
+binTree :: BinomialBit Int
+binTree = One 2 (P 3 2 (Bin 4 (Bin 7 Empty Empty 0) (Bin 3 Empty Empty 0) 1))
+
+{-@ measure rank @-}
+{-@ rank :: BinomialBit a -> Nat @-}
+rank :: BinomialBit a -> Int
+rank (Zero r) = r
+rank (One r _) = r
+
+{-@ type BinomialHeap a = PList <{\hd v -> (rank hd) == (rank v) - 1 }> (BinomialBit a) @-}
+type BinomialHeap a = PList (BinomialBit a)
+
+{-@ measure isNil @-}
+{-@ isNil ::PList a ->  Bool @-}
+isNil :: PList a -> Bool
+isNil Nil = True
+isNil _ = False
+
+{-@ measure bhead @-}
+{-@ bhead :: x: {BinomialHeap a | not (isNil x)}  -> BinomialBit a @-}
+bhead :: BinomialHeap a -> BinomialBit a
+bhead (Cons x _) = x
+
+{-@ reflect bRank @-}
+{-@ bRank :: BinomialHeap a -> Nat @-}
+bRank :: BinomialHeap a -> Int
+bRank Nil = 0
+bRank (Cons b bs) = rank b
+
+{-@ bheap:: BinomialHeap Int @-}
+bheap :: BinomialHeap Int
+bheap = Cons (One 0 (singleton 1)) (Cons (Zero 1) Nil)
+
+{-@ reflect bSum @-}
+{-@ bSum:: b1: BinomialBit a -> b2: { b: BinomialBit a | rank b == rank b1} -> {b: BinomialBit a | rank b == rank b1}  @-}
+bSum :: (Ord a) => BinomialBit a -> BinomialBit a -> BinomialBit a
+bSum (Zero r1) (Zero r2) = Zero r1
+bSum (Zero r1) (One _ p2) = One r1 p2
+bSum (One _ p1) (Zero r2) = One r2 p1
+bSum (One r1 _) (One _ _) = Zero r1
+
+{-@ reflect zero @-}
+{-@ zero :: BinomialBit a @-}
+zero :: BinomialBit a
+zero = Zero 0
+
+{-@ reflect bHalfAdder @-}
+{-@ bHalfAdder :: b1: BinomialBit a
+               -> b2: {b: BinomialBit a | rank b == rank b1}
+               -> (BinomialBit a, BinomialBit a)<{\s c -> rank s == rank b1 && rank c == rank b1 + 1}> @-}
+bHalfAdder :: (Ord a) => BinomialBit a -> BinomialBit a -> (BinomialBit a, BinomialBit a)
+bHalfAdder b1 b2 = (bSum b1 b2, bCarry b1 b2)
+
+{-@ reflect bFullAdder @-}
+{-@ bFullAdder :: b1: BinomialBit a
+               -> b2: {b: BinomialBit a | rank b == rank b1}
+               -> c: {b: BinomialBit a | rank b == rank b1}
+               -> (BinomialBit a, BinomialBit a)<{\s co -> rank s == rank b1 && rank co == rank b1 + 1}> @-}
+bFullAdder :: (Ord a) => BinomialBit a -> BinomialBit a -> BinomialBit a -> (BinomialBit a, BinomialBit a)
+bFullAdder b1 b2 c =
+  let (s, c1) = bHalfAdder b1 b2
+      (s', c2) = bHalfAdder s c
+   in (s', bSum c1 c2)
+
+{-@ reflect bCarry @-}
+{-@ bCarry:: Ord a => b1: {b: BinomialBit a | rank b >= 0} -> b2: {b: BinomialBit a | rank b == rank b1} -> {b: BinomialBit a | rank b == rank b1 + 1}  @-}
+bCarry :: (Ord a) => BinomialBit a -> BinomialBit a -> BinomialBit a
+bCarry (Zero r1) (Zero r2) = Zero (r1 + 1)
+bCarry (Zero r1) (One _ p2) = Zero (r1 + 1)
+bCarry (One _ p1) (Zero r2) = Zero (r2 + 1)
+bCarry (One r1 p1) (One _ p2) = One (r1 + 1) (link p1 p2)
+
+{-@ reflect bAdd @-}
+{-@ bAdd :: {h1: BinomialHeap a | bRank h1 == 0} -> {h2: BinomialHeap a | bRank h2 == 0} -> BinomialHeap a @-}
+bAdd :: (Ord a) => BinomialHeap a -> BinomialHeap a -> BinomialHeap a
+bAdd xs ys = addWithCarry xs ys (Zero 0)
+
+{-@ reflect addWithCarry @-}
+{-@ addWithCarry :: h1: BinomialHeap a
+                  -> {h2: BinomialHeap a |  (bRank h2 == bRank h1 || isNil h1) || isNil h2 }
+                  -> carry: { c : BinomialBit a | ((not isNil h1) => rank carry == bRank h1) && ((not isNil h2) => rank carry == bRank h2)}
+                  -> {b: BinomialHeap a | ((not isNil h1) => rank carry == bRank h1) && ((not isNil h2) => rank carry == bRank h2)} / [len h1, len h2, 0]@-}
+addWithCarry :: (Ord a) => BinomialHeap a -> BinomialHeap a -> BinomialBit a -> BinomialHeap a
+addWithCarry Nil Nil c
+  | c == (Zero 0) = Nil
+  | otherwise = Cons c Nil
+addWithCarry (Cons x xs) Nil (Zero r) = Cons x xs
+addWithCarry (Cons x xs) Nil c@(One r _) =
+  let z = Zero (rank x)
+      (s, c') = bFullAdder x z c
+   in -- c' has rank (rank x + 1)
+      -- If xs = Cons x' xs', then from PList invariant: rank x == rank x' - 1
+      -- So rank x' == rank x + 1, and bRank xs == rank x' == rank x + 1 == rank c'
+      case xs of
+        Nil -> Cons s Nil
+        Cons x' xs' -> (lemma_rank_preservation x xs c) `seq` (Cons s (addWithCarry xs Nil c'))
+addWithCarry Nil (Cons y ys) c =
+  let z = Zero (rank y)
+      (s, c') = bFullAdder z y c
+   in case ys of
+        Nil -> Cons s Nil
+        Cons y' ys' -> Cons s (addWithCarry Nil ys c')
+addWithCarry (Cons x xs) (Cons y ys) c =
+  let (s, c') = bFullAdder x y c
+   in case (xs, ys) of
+        (Nil, Nil) -> Cons s Nil
+        (Cons x' xs', Nil) -> Cons s (addWithCarry xs Nil c')
+        (Nil, Cons y' ys') -> Cons s (addWithCarry Nil ys c')
+        (Cons x' xs', Cons y' ys') -> Cons s (addWithCarry xs ys c')
+
+{-@ lemma_sum_rank :: x:{BinomialBit a | rank x >= 0}
+                  -> y:{BinomialBit a | rank y >= 0 && rank y == rank x}
+                  -> c:{BinomialBit a | rank c >= 0 && rank c == rank x}
+                   -> { rank (fst (bFullAdder x y c)) == rank x}
+@-}
+lemma_sum_rank :: (Ord a) => BinomialBit a -> BinomialBit a -> BinomialBit a -> ()
+lemma_sum_rank x y c =
+  let (s, c') = bFullAdder x y c
+   in rank s `seq` ()
+
+{-@ reflect lemma_rank_preservation @-}
+{-@ lemma_rank_preservation :: x:{BinomialBit a | rank x >= 0}
+                            -> xs: BinomialHeap a
+                            -> c:{BinomialBit a | rank c >= 0 && rank c == rank x}
+                            -> { rank (fst (bFullAdder x (Zero (rank c)) c)) == rank x }
+@-}
+lemma_rank_preservation :: (Ord a) => BinomialBit a -> BinomialHeap a -> BinomialBit a -> ()
+lemma_rank_preservation x xs c =
+  let (s, c') = bFullAdder x (Zero (rank c)) c
+   in rank s `seq` ()
+
+-- {-@ lemma_addWithCarry_rank :: xs:BinomialHeap a
+--                             -> c':{BinomialBit a | rank c' == bRank 0}
+--                             -> s:{BinomialBit a | rank s >= 0}
+--                             -> {v:() | (not isNil (addWithCarry xs Nil c')) =>
+--                                       rank (bhead (addWithCarry xs Nil c')) == rank s + 1}
+-- @-}
+lemma_addWithCarry_rank :: (Ord a) => BinomialHeap a -> BinomialBit a -> BinomialBit a -> ()
+lemma_addWithCarry_rank xs c' s =
+  case addWithCarry xs Nil c' of
+    Nil -> ()
+    (Cons h _) -> rank h `seq` ()

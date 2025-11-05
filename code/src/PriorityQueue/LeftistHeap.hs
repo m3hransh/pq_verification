@@ -41,6 +41,11 @@ rrank :: LeftistHeap a -> Int
 rrank EmptyHeap = 0
 rrank h@(HeapNode _ _ _ r) = r
 
+{-@ reflect bagSingleton @-}
+{-@ bagSingleton :: x : a -> b: { Bag a | b = B.put x (B.empty)} @-}
+bagSingleton :: (Ord a) => a -> B.Bag a
+bagSingleton x = B.put x B.empty
+
 {-@ reflect min @-}
 {-@ min :: x : a -> y : a -> {v : a |  v <= x && v <= y} @-}
 min :: (Ord a) => a -> a -> a
@@ -81,7 +86,11 @@ bogusUnion = ()
 
 -- heapMerge two heaps
 {-@ reflect heapMerge @-}
-{-@ heapMerge :: h1 : LeftistHeap a -> h2: LeftistHeap a -> { h : LeftistHeap a | (HeapMergeMin h1 h2 h) && (BagUnion h1 h2 h) } / [size h1, size h2, 0] @-}
+{-@ heapMerge :: h1 : LeftistHeap a
+                -> h2: LeftistHeap a
+                -> { h : LeftistHeap a | (HeapMergeMin h1 h2 h) && (BagUnion h1 h2 h) }
+                / [size h1, size h2, 0]
+@-}
 heapMerge :: (Ord a) => LeftistHeap a -> LeftistHeap a -> LeftistHeap a
 heapMerge EmptyHeap EmptyHeap = EmptyHeap
 heapMerge EmptyHeap h2@(HeapNode _ _ _ _) = h2
@@ -91,12 +100,22 @@ heapMerge h1@(HeapNode x1 l1 r1 _) h2@(HeapNode x2 l2 r2 _)
   | otherwise = makeHeapNode x2 l2 ((heapMerge h1 r2) `withProof` lemma_heapMerge_case2 x2 x1 r2 h1)
 
 -- Transitivity lemma for isLowerBound
-{-@ lemma_isLowerBound_transitive :: x : a -> y : {v : a | x <= v} -> h : {h : LeftistHeap a | isLowerBound y h} -> {isLowerBound x h} @-}
+{-@ lemma_isLowerBound_transitive :: x : a
+      -> y : {v : a | x <= v}
+      -> h : {h : LeftistHeap a | isLowerBound y h}
+      -> {isLowerBound x h}
+@-}
 lemma_isLowerBound_transitive :: (Ord a) => a -> a -> LeftistHeap a -> Proof
 lemma_isLowerBound_transitive x y EmptyHeap = ()
 lemma_isLowerBound_transitive x y (HeapNode z l r _) = lemma_isLowerBound_transitive x y l &&& lemma_isLowerBound_transitive x y r *** QED
 
-{-@ lemma_merge_case1 :: x1 : a  -> x2 : { v : a |  x1  <= v}-> r1 : LeftistHeapBound a x1 -> h2 : {h : LeftistHeapBound a x2 | not (heapIsEmpty h)}  -> {isLowerBound x1 (heapMerge r1 h2)} / [size r1, size h2, 1]@-}
+{-@ lemma_merge_case1 :: x1 : a
+                      -> x2 : {a |  x1  <= x2}
+                      -> r1 : LeftistHeapBound a x1
+                      -> h2 : {LeftistHeapBound a x2 | not (heapIsEmpty h2)}
+                      -> {isLowerBound x1 (heapMerge r1 h2)}
+                      / [size r1, size h2, 1]
+@-}
 lemma_merge_case1 :: (Ord a) => a -> a -> LeftistHeap a -> LeftistHeap a -> Proof
 lemma_merge_case1 x1 x2 EmptyHeap h2 =
   isLowerBound x1 (heapMerge EmptyHeap h2)
@@ -109,7 +128,12 @@ lemma_merge_case1 x1 x2 r1@(HeapNode _ _ _ _) h2@(HeapNode _ _ _ _) =
  where
   heapMerged = heapMerge r1 h2
 
-{-@ lemma_heapMerge_case2 :: x2 : a -> x1 : { v : a |  x2  <= v} -> r1 : {h : LeftistHeap a | isLowerBound x2 h} -> h2 : {h : LeftistHeap a | not (heapIsEmpty h) && isLowerBound x1 h}  -> {isLowerBound x2 (heapMerge h2 r1)} / [size h2 , size r1, 1] @-}
+{-@ lemma_heapMerge_case2 :: x2 : a
+                          -> x1 : { v : a |  x2  <= v}
+                          -> r1 : {h : LeftistHeap a | isLowerBound x2 h}
+                          -> h2 : {h : LeftistHeap a | not (heapIsEmpty h) && isLowerBound x1 h}
+                          -> {isLowerBound x2 (heapMerge h2 r1)} / [size h2 , size r1, 1]
+@-}
 lemma_heapMerge_case2 :: (Ord a) => a -> a -> LeftistHeap a -> LeftistHeap a -> Proof
 lemma_heapMerge_case2 x2 x1 EmptyHeap h2 =
   isLowerBound x2 (heapMerge EmptyHeap h2)
@@ -124,7 +148,12 @@ lemma_heapMerge_case2 x2 x1 r1@(HeapNode _ _ _ _) h2@(HeapNode _ _ _ _) =
  where
   heapMerged = heapMerge h2 r1
 
-{-@ heapInsert :: Ord a => x : a -> h1 : LeftistHeap a -> {h : LeftistHeap a | not (heapIsEmpty h1) => isLowerBound (min x (heapFindMin h1)) h} @-}
+{-@ heapInsert :: x : a
+                -> h1 : LeftistHeap a
+                -> {h : LeftistHeap a |
+                      not (heapIsEmpty h1) => isLowerBound (min x (heapFindMin h1)) h
+                      && bag h = B.put x (bag h1) }
+@-}
 heapInsert :: (Ord a) => a -> LeftistHeap a -> LeftistHeap a
 heapInsert x h = heapMerge (HeapNode x EmptyHeap EmptyHeap 1) h
 
@@ -132,6 +161,29 @@ heapDeleteMin :: (Ord a) => LeftistHeap a -> LeftistHeap a
 heapDeleteMin EmptyHeap = EmptyHeap
 heapDeleteMin h@(HeapNode _ l r _) = heapMerge l r
 
+{-@ reflect isEmptyView @-}
+{-@  isEmptyView :: MinView q a -> Bool @-}
+isEmptyView :: MinView q a -> Bool
+isEmptyView EmptyView = True
+isEmptyView (Min _ _) = False
+
+{-@ reflect getMinValue @-}
+{-@ getMinValue :: m: { MinView q a| not isEmptyView m} -> a @-}
+getMinValue :: MinView q a -> a
+getMinValue (Min x _) = x
+
+{-@ reflect getRestHeap @-}
+{-@ getRestHeap :: m: { MinView q a| not isEmptyView m} -> q a @-}
+getRestHeap :: MinView q a -> q a
+getRestHeap (Min _ h) = h
+
+{-@ predicate SplitOK H S = (heapIsEmpty H => isEmptyView S)
+                            && (not (heapIsEmpty H) => not (isEmptyView S)
+                            && getMinValue S == heapFindMin H
+                            && bag H == B.put (getMinValue S) (bag (getRestHeap S)))
+@-}
+{-@ heapSplit :: h:LeftistHeap a -> { s:MinView LeftistHeap a | SplitOK h s }
+@-}
 heapSplit :: (Ord a) => LeftistHeap a -> MinView LeftistHeap a
 heapSplit EmptyHeap = EmptyView
 heapSplit (HeapNode x l r _) = Min x (heapMerge l r)
@@ -144,5 +196,6 @@ instance PriorityQueue LeftistHeap where
   empty = EmptyHeap
   findMin = safeHeapFindMin
   isEmpty = heapIsEmpty
+  merge = heapMerge
   insert = heapInsert
   splitMin = heapSplit
