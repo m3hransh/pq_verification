@@ -23,7 +23,7 @@ ordering, balance, or size constraints can be expressed concisely at the type
 level.
 
 In the remainder of this chapter, we present the specification language of
-\texttt{LiquidHaskell} (Section~\ref{sec:specification}), and discuss its strengths, limitations,
+\texttt{LiquidHaskell} (\S~\ref{sec:specification}), and discuss its strengths, limitations,
 and relation to other verification frameworks.
 
 
@@ -57,7 +57,7 @@ With refinement types, we can express stronger specifications. In
 \texttt{-@} and \texttt{@-}. For instance, we can define non-negative integers as:
 
 \begin{code}
-{-@ x :: {v:Int | v >= 0} @-}
+{-@ x :: {v : Int | v >= 0} @-}
 x :: Int
 x = 2
 \end{code}
@@ -76,7 +76,7 @@ For brevity, one can use type aliases or predicates to define commonly used refi
 
 \begin{code}
 predicate Btwn Lo N Hi = Lo <= N && N < Hi
-type Nat =  {v:Int | v >= 0}
+type Nat =  {v : Int | v >= 0}
 \end{code}
 Additionally, Holes can be used for Haskell types, as those types can be infereded from the
 regualar Haskell type signature or via GHC's type inference \cite{vazou_liquidhaskell_2014}.
@@ -153,7 +153,7 @@ lookup :: i : Nat -> xs : {[a] | i < len xs} -> a
 
 The type of second argument states that the list \texttt{xs} must have length greater than \texttt{i}.
 \texttt{len} is a function defined by \texttt{LiquidHaskell} in the refinement logic that returns the length of the list.
-In Section \ref{sec:reflection}, we will show how to define and use user-defined functions in the refinement logic.
+In \S\ref{sec:reflection}, we will show how to define and use user-defined functions in the refinement logic.
 
 \section{Refined Data Types}
 \label{sec:lh-refined-datatypes}
@@ -200,8 +200,8 @@ bag (x : xs) = B.put x (bag xs)
 definition of the function\cite{niki_lecture_2024}.
 For example, \texttt{bag} measure definition refines the type of the \texttt{List}'s constructor to be:
 \begin{code}
-Nil  :: {v:List a | bag v = B.empty}
-Cons :: x:a -> l:List a -> {v:List a | bag v = B.put x (bag l)}
+Nil  :: {v : List a | bag v = B.empty}
+Cons :: x : a -> l : List a -> {v : List a | bag v = B.put x (bag l)}
 \end{code}
 
 Thus, we can use the \texttt{bag} function in the refinement logic to reason about
@@ -236,7 +236,7 @@ To illustrate the use of reflection, we define the \texttt{(++)} function in the
 {-@ infixr ++ @-}
 {-@ reflect ++ @-}
 
-{-@ (++) :: xs:[a] -> ys:[a] -> { zs:[a] | len zs == len xs + len ys } @-}
+{-@ (++) :: xs : [a] -> ys : [a] -> { zs : [a] | len zs == len xs + len ys } @-}
 (++) :: [a] -> [a] -> [a]
 [] ++ ys = ys
 (x : xs) ++ ys = x : (xs ++ ys)
@@ -252,7 +252,7 @@ The \texttt{reflect} annotation, lift the \texttt{(++)} into the logic in three 
 
 
 \begin{code}
-(++) :: xs:[a] -> ys:[a]
+(++) :: xs : [a] -> ys : [a]
   -> { zs:[a] | len zs == len xs + len ys
      && zs = xs ++ ys
      && ppProp xs ys }
@@ -318,7 +318,7 @@ The alias \texttt{Proof} is defined as the unit type \texttt{()}, representing t
 
 \paragraph{Equality Combinator.}
 \begin{code}[label={lst:proof-eq}]
-{-@ (===) :: x:a -> y:{a | y == x} -> {v:a | v == x && v == y} @-}
+{-@ (===) :: x : a -> y : {a | y == x} -> {v : a | v == x && v == y} @-}
 (===) :: a -> a -> a
 _ === y = y
 \end{code}
@@ -343,7 +343,7 @@ The \texttt{(?)} combinator preserves refinements. With type \texttt{a<pa> -> b<
 
 \paragraph{WithProof Combinator.}
 \begin{code}[label={lst:proof-withproof}]
-{-@ withProof :: x:a -> b -> {v:a | v = x} @-}
+{-@ withProof :: x : a -> b -> {v : a | v = x} @-}
 {-@ define withProof x y = (x) @-}
 withProof :: a -> b -> a
 withProof x _ = x
@@ -355,7 +355,7 @@ In the following example, we show how to use these combinators to verify that th
 
 
 \begin{code}[label=lst:associative]
-{-@ assoc :: xs:[a] -> ys:[a] -> zs:[a]
+{-@ assoc :: xs : [a] -> ys : [a] -> zs : [a]
 -> { (xs ++ ys) ++ zs = xs ++ (ys ++ zs) } @-}
 assoc :: [a] -> [a] -> [a] -> ()
 assoc [] ys zs = ([] ++ ys) ++ zs
@@ -395,7 +395,7 @@ Empty -> patError "findMin"
 Here, \texttt{patError} is technically total, but it has an uninhabited type:
 
 \begin{code}
-patError :: {v:String | false} -> a
+patError :: {v : String | false} -> a
 \end{code}
 
 \texttt{LiquidHaskell} eliminates such dead code by requiring refinements that ensure \texttt{findMin} is only applied to non-empty heaps.
@@ -412,14 +412,14 @@ predicate NonEmp H = isNonEmpty H
 Using this predicate, we refine the type of \texttt{findMin}:
 
 \begin{code}
-findMin :: {h:Heap a | NonEmp h} -> a
+findMin :: {h : Heap a | NonEmp h} -> a
 \end{code}
 
 Now \texttt{LiquidHaskell} verifies that the \texttt{Empty} branch is unreachable.
 When pattern matching on \texttt{d = Empty}, the environment is refined to:
 
 \begin{code}
-Empty :: {v:Heap a | NonEmp v && v = Empty}
+Empty :: {v : Heap a | NonEmp v && v = Empty}
 \end{code}
 
 This condition is contradictory: \texttt{v = Empty} implies the heap is empty, while \texttt{NonEmp v} requires it to be non-empty.
@@ -431,7 +431,7 @@ The same reasoning applies to \texttt{deleteMin}, which is unsafe on empty heaps
 By refining its type, we likewise guarantee totality:
 
 \begin{code}
-deleteMin :: {h:Heap a | NonEmp h} -> Heap a
+deleteMin :: {h : Heap a | NonEmp h} -> Heap a
 \end{code}
 
 \section{Termination}
@@ -443,7 +443,7 @@ Ensuring that all functions terminate is necessary for the soundness of the refi
 For example, consider the factorial function:
 
 \begin{code}
-fac :: n:Nat -> Nat / [n]
+fac :: n : Nat -> Nat / [n]
 \end{code}
 
 The termination metric \texttt{[n]} specifies that \texttt{n} must decrease in each recursive call.
@@ -452,7 +452,7 @@ Metrics need not be limited to single arguments.
 For instance, the \texttt{range} function uses an expression as the metric:
 
 \begin{code}
-{-@ range :: lo:Int -> hi:Int -> [Int] / [hi - lo] @-}
+{-@ range :: lo : Int -> hi : Int -> [Int] / [hi - lo] @-}
 range :: Int -> Int -> [Int]
 range lo hi
   | lo < hi = lo : range (lo + 1) hi
@@ -477,7 +477,7 @@ gcd a b | a == b = a
 Its refined type uses lexicographic ordering:
 
 \begin{code}
-gcd :: a:Nat -> b:Nat -> Nat / [a, b]
+gcd :: a : Nat -> b : Nat -> Nat / [a, b]
 \end{code}
 
 The same technique applies to mutually recursive functions such as \texttt{isEven} and \texttt{isOdd} \cite{vazou_liquidhaskell_2014}:
@@ -493,8 +493,8 @@ Here, \texttt{isEven} decreases on its argument, while \texttt{isOdd} does not.
 By specifying metrics as:
 
 \begin{code}
-isEven :: n:Nat -> Bool / [n, 0]
-isOdd :: n:Nat -> Bool / [n, 1]
+isEven :: n : Nat -> Bool / [n, 0]
+isOdd :: n : Nat -> Bool / [n, 1]
 \end{code}
 
 \texttt{LiquidHaskell} checks that each recursive call reduces the lexicographic metric: e.g., \texttt{[n, 0]} is greater than \texttt{[n-1, 1]} in the call from \texttt{isEven} to \texttt{isOdd}.
@@ -504,7 +504,7 @@ Termination checking also extends to finite data structures by using their size.
 For example, the \texttt{bag} function can be checked using list length:
 
 \begin{code}
-bag :: Ord a => xs:[a] -> Bag a / [len xs]
+bag :: Ord a => xs : [a] -> Bag a / [len xs]
 \end{code}
 
 In practice, \texttt{LiquidHaskell} assumes by default that the first argument with a size measure (e.g., \texttt{len} for lists) decreases \cite{vazou_liquidhaskell_2014}.
@@ -526,7 +526,7 @@ We can activate PLE by adding \texttt{\{-@ LIQUID "---ple" @-\}} annotation to a
 
 \begin{code}
 {-@ LIQUID "--ple" @-}
-{-@ assoc :: xs:[a] -> ys:[a] -> zs:[a]
+{-@ assoc :: xs : [a] -> ys : [a] -> zs : [a]
 -> { (xs ++ ys) ++ zs = xs ++ (ys ++ zs) } @-}
 assoc :: [a] -> [a] -> [a] -> ()
 assoc [] ys zs = ()
