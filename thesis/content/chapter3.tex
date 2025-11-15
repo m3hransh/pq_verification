@@ -150,12 +150,12 @@ There are three invariants that pennants must satisfy:
 \begin{itemize}
     \item {\textbf{Minimum Property}: The root of the pennant is less than or equal to all other elements in the pennant.}
     \item {\textbf{Left-ordering Property}: For every node in the internal binary tree, the value of the left child is less than or equal to the value of the right child.}
-    \item {\textbf{Perfect Binary Property}: The internal binary tree is a perfect binary tree, meaning all internal nodes have two children and all leaves are at the same level.}
+    \item {\textbf{Perfect Binary Tree Property}: The internal binary tree is a perfect binary tree, meaning all internal nodes have two children and all leaves are at the same level.}
 \end{itemize}
 
 \input{figures/binomial.tex}
-The fundamental operation on pennants is \texttt{link}, which takes two pennants of the same height \(h\) and merges them into a single pennant of height \(h+1\).
-The root of the new pennant is the smaller of the two original roots.
+The primary operation on pennants is \texttt{link}, which combines two pennants of equal height~$h$ into a single pennant of height~$h+1$.
+The root of the resulting pennant is less than or equal to the roots of the two original pennants.
 
 \begin{code}[caption={Linking two Pennants}, label={lst:pennant-link}]
 link :: (Ord a) => Pennant a -> Pennant a -> Pennant a
@@ -164,7 +164,8 @@ link p1@(P r1 h t1) p2@(P r2 _ t2)
   | otherwise = P r2 (h + 1) (Bin r1 t1 t2 h)
 \end{code}
 
-A binomial heap is then represented as a list of "bits", where each bit can be either \texttt{Zero} or \texttt{One}. A \texttt{One} bit at position \(i\) signifies the presence of a pennant of height \(i\).
+A binomial heap is then represented as a list of "bits", where each bit can be either \texttt{Zero} or \texttt{One}.
+A \texttt{One} bit at position (\texttt{rank}) \(i\)  signifies the presence of a pennant of height \(i\).
 
 \begin{code}[caption={Binomial Heap Representation}, label={lst:binary-binomial-heap}]
 data BinomialBit a =
@@ -269,30 +270,76 @@ insert :: (Ord a) => a
 insert x heap = merge [One 0 (P x 0 (Empty))] heap
 \end{code}
 }
-    \item {\textbf{splitMin}: This is the most involved operation. First, the pennant with the minimum root is found and removed from the list of pennants.
-Let's say it has rank \(k\). After removing the minimum element from the pennant, the perfect binary tree is then "dismantled". 
-A perfect binary tree of height \(k-1\) can be split into list of pennants of ranks \(0\) to \(k-1\).
-Removing the root leaves another binomial heaps (list of pennants), which are then merged back into the heap.
-The overall complexity is \(O(\log n)\).
+    \item {\textbf{findMin}: This requires finding the minimum among the roots of all pennants in the heap.
+Since there are at most \(\log n\) pennants, this takes \(O(\log n)\) time. The implementation recursively scans through the list of bits, skipping \texttt{Zero} bits and comparing the roots of \texttt{One} bits to find the minimum.}
+\begin{code}[caption={Finding Minimum in Binomial Heap}, label={lst:heap-find}]
+findMin :: (Ord a) => BinomialHeap a -> Maybe a
+findMin Nil = Nothing
+findMin (Cons (Zero _) bs) = findMin bs
+findMin (Cons (One _ (P r _ _)) Nil) = Just r
+findMin (Cons (One _ (P r _ _)) bs) = 
+  case findMin bs of
+    Nothing -> Just r
+    Just r' -> Just (min r r')
+\end{code}
+
+    \item {\textbf{extractMin}: This helper function scans through the heap to find the pennant with the minimum root value, removes it from the heap, and returns both the pennant and the remaining heap. It recursively compares roots and maintains heap structure by preserving \texttt{Zero} bits and selecting the pennant with the smaller root.}
+\begin{code}[caption={Extract Minimum Pennant from Binomial Heap}, label={lst:heap-extract}]
+extractMin :: (Ord a) => BinomialHeap a 
+                      -> (Pennant a, BinomialHeap a)
+extractMin (Cons (Zero r) bs) = 
+  let (p, bs') = extractMin bs
+   in (p, Cons (Zero r) bs')
+extractMin (Cons (One r p) Nil) = (p, Nil)
+extractMin (Cons (One r p@(P m _ _)) bs) = 
+  case extractMin bs of
+    (p'@(P m' _ _), bs') 
+      | m <= m' -> (p, Cons (Zero r) bs)
+      | otherwise -> (p', Cons (One r p) bs')
+\end{code}
+
+    \item {\textbf{splitMin}: This is the most involved operation. First, \texttt{extractMin} finds and removes the pennant with the minimum root from the list of pennants.
+Let's say it has rank \(k\). After removing the minimum root from this pennant, the remaining perfect binary tree of height \(k-1\) must be converted back into a binomial heap. This is accomplished by the \texttt{dismantle} function, which recursively splits the perfect binary tree into a list of pennants of ranks \(0\) to \(k-1\).
+These pennants are then reversed and merged back with the remaining heap.
+The overall complexity is \(O(\log n)\).}
 \begin{code}[caption={Splitting Minimum from Binomial Heap}, label={lst:heap-split}]
 splitMin :: (Ord a) => BinomialHeap a
                     -> MinView BinomialHeap a
-splitMin heap = case extractMin heap of
-  EmptyView -> EmptyView
-  Min (Min a t) ts -> Min a (reverse (dismantle t) `add` ts)
+splitMin Nil = EmptyView
+splitMin heap = 
+  let (minPennant, restHeap) = extractMin heap
+      converted = case minPennant of
+        P _ 0 _ -> restHeap
+        P _ _ bt -> 
+          let dismantled = reverseToBinomialHeap (dismantle bt)
+           in add restHeap dismantled
+   in Min (root minPennant) converted
 \end{code}
-}
 
-    \item {\textbf{findMin}: This requires finding the minimum among the roots of all pennants in the heap.
-                            Since there are at most \(\log n\) pennants, this takes \(O(\log n)\) time.}
-\begin{code}[caption={Finding Minimum in Binomial Heap}, label={lst:heap-find}]
-findMin :: (Ord a) => BinomialHeap a -> Maybe a
-findMin heap = case extractMin heap of
-  EmptyView -> Nothing
-  Min (Min a _) _ -> Just a
+To facilitate the dismantling process, we introduce an auxiliary data structure \texttt{ReversedBinomialHeap}, which is a list of bits with \emph{decreasing} ranks (as opposed to the standard \texttt{BinomialHeap} where ranks increase).
+\begin{code}[caption={Reversed Binomial Heap}, label={lst:reversed-heap}]
+data ReversedBinomialHeap a =
+    RNil
+  | RCons { rhd :: BinomialBit a
+          , rtl :: ReversedBinomialHeap a
+          }
 \end{code}
+
+The \texttt{dismantle} function takes a perfect binary tree and converts it into a reversed list of pennants with decreasing ranks. For a tree of height \(h\), it produces pennants of ranks \(h, h-1, \ldots, 0\). The function works by recursively processing the right spine of the tree: at each node, it creates a pennant from the current node's value and left subtree, then recursively dismantles the right subtree.
+\begin{code}[caption={Dismantle Perfect Binary Tree}, label={lst:dismantle}]
+dismantle :: (Ord a) => BinTree a 
+                     -> ReversedBinomialHeap a
+dismantle Empty = RNil
+dismantle (Bin m l r h) = case r of
+  Empty -> RCons (One h (P m h l)) RNil
+  Bin _ _ _ hr -> 
+    let rest = dismantle r
+     in RCons (One h (P m h l)) rest
+\end{code}
+
+The reversed heap is then converted back to a standard binomial heap using \texttt{reverseToBinomialHeap}, which reverses the list so that ranks increase from left to right. This conversion is necessary because the standard heap operations expect pennants ordered by increasing rank.
 \end{itemize}
 
 This representation of binomial heaps is both elegant and well-suited for formal verification, as we will discuss in Chapter \ref{ch:verification}.
-Rather than verifying every operation, we concentrate on the merge operation, which serves as the fundamental building block from which other operations can be derived.
+Rather than verifying every operation, we concentrate on the main operations, which serves as the fundamental building block from which other operations can be derived.
 
