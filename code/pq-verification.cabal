@@ -16,7 +16,7 @@ library
   exposed-modules:
       PriorityQueue.LeftistHeap
       Example
-      -- PriorityQueue.BinomialHeap
+      PriorityQueue.BinomialHeap
       PriorityQueue.Base
 
   hs-source-dirs:
@@ -36,9 +36,6 @@ test-suite priority-queue
   hs-source-dirs: test
   main-is: Main.hs
   build-depends:
-    liquid-prelude,
-    liquid-vector,
-    liquidhaskell,
     base,
     pq-verification,
     tasty,
@@ -46,8 +43,9 @@ test-suite priority-queue
   other-modules:
     PriorityQueue.LeftistHeapTests
     ExampleTests
+    PriorityQueue.BinomialHeapTests
 
   default-language: Haskell2010
 
-  ghc-options:  -fplugin=LiquidHaskell 
+  -- ghc-options:  -fplugin=LiquidHaskell 
  

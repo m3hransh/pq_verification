@@ -1,6 +1,7 @@
 module Main where
 
 import ExampleTests
+import PriorityQueue.BinomialHeapTests
 import PriorityQueue.LeftistHeapTests
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -13,5 +14,6 @@ tests =
   testGroup
     "Tests"
     [ -- leftistHeapTests
-      exampleTests
+      exampleTests,
+      binomialHeapTests
     ]

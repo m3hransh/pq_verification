@@ -3,7 +3,7 @@ module PriorityQueue.BinomialHeap where
 import Control.Arrow (Arrow (second))
 import qualified Language.Haskell.Liquid.Bag as B
 import Language.Haskell.Liquid.ProofCombinators
-import Prelude hiding (max, sum)
+import Prelude hiding (max, min, sum)
 
 {-@ LIQUID "--reflection" @-}
 {-@ LIQUID "--ple" @-}
@@ -12,6 +12,11 @@ import Prelude hiding (max, sum)
 {-@ max:: forall <p :: Int -> Bool> . Int <p> -> Int<p> -> Int<p> @-}
 max :: Int -> Int -> Int
 max x y = if x > y then x else y
+
+{-@ reflect min @-}
+{-@ min:: (Ord a) => a -> a -> a @-}
+min :: (Ord a) => a -> a -> a
+min x y = if x <= y then x else y
 
 -- Binary tree with heap property
 {-@ reflect isLowerBound @-}
@@ -88,13 +93,13 @@ isEmpty _ = False
 
 {-@reflect bag @-}
 {-@ bag :: BinTree a -> Bag a @-}
-bag :: BinTree a -> B.Bag a
+bag :: (Ord a) => BinTree a -> B.Bag a
 bag Empty = B.empty
 bag (Bin a l r _) = B.put a (B.union (bag l) (bag r))
 
 {-@reflect pBag @-}
 {-@ pBag :: Pennant a -> Bag a @-}
-pBag :: Pennant a -> B.Bag a
+pBag :: (Ord a) => Pennant a -> B.Bag a
 pBag (P a _ bt) = B.put a (bag bt)
 
 {-@ predicate BagUnion H1 H2 H = (pBag H == B.union (pBag H1) (pBag H2)) @-}
@@ -105,25 +110,6 @@ link :: (Ord a) => Pennant a -> Pennant a -> Pennant a
 link (P x1 s1 t1) (P x2 s2 t2)
   | x1 <= x2 = (P x1 (s1 + 1) ((Bin x2 t2 t1 (s1)) `withProof` (lemma_isLowerBound_transitive x1 x2 t2)))
   | otherwise = (P x2 (s1 + 1) ((Bin x1 t1 t2 (s1)) `withProof` lemma_isLowerBound_transitive x2 x1 t1))
-
-{-@ data PList a < p :: a -> a -> Bool> =
-        Nil
-      | Cons { phd :: a, ptl :: PList < p >  a < p phd > }  @-}
-data PList a
-  = Nil
-  | Cons a (PList a)
-
-{-@ measure len @-}
-{-@ len :: PList a -> Nat @-}
-len :: PList a -> Int
-len Nil = 0
-len (Cons _ t) = 1 + len t
-
-{-@ measure bhsize @-}
-{-@ bhsize :: PList a -> Nat @-}
-bhsize :: PList a -> Int
-bhsize Nil = 0
-bhsize (Cons h t) = 1 + bhsize t
 
 {-@ data BinomialBit a =
         Zero { zorder :: Nat }
@@ -142,21 +128,65 @@ rank :: BinomialBit a -> Int
 rank (Zero r) = r
 rank (One r _) = r
 
-{-@ type BinomialHeap a = PList <{\hd v -> (rank hd) == (rank v) - 1 }> (BinomialBit a) @-}
-type BinomialHeap a = PList (BinomialBit a)
+-- Refined data definition for BinomialHeap that checks only immediate neighbors
+{-@ data BinomialHeap [len] a =
+        Nil
+      | Cons { phd :: BinomialBit a
+             , ptl :: {bs : BinomialHeap a | not (isNil bs) => rank ( bhead bs) = (rank phd) + 1}
+             }
+@-}
+-- Plain PList without parameterized invariant
+data BinomialHeap a
+  = Nil
+  | Cons
+      { phd :: BinomialBit a
+      , ptl :: (BinomialHeap a)
+      }
+  deriving (Show, Eq)
+
+{-@ measure len @-}
+{-@ len :: BinomialHeap a -> Nat @-}
+len :: BinomialHeap a -> Int
+len Nil = 0
+len (Cons _ t) = 1 + len t
 
 {-@ measure isNil @-}
-{-@ isNil ::PList a ->  Bool @-}
-isNil :: PList a -> Bool
+{-@ isNil ::BinomialHeap a ->  Bool @-}
+isNil :: BinomialHeap a -> Bool
 isNil Nil = True
 isNil _ = False
 
 {-@ measure bhead @-}
-{-@ bhead :: x: {BinomialHeap a | not (isNil x)}  -> BinomialBit a @-}
+{-@ bhead :: {b: BinomialHeap a| not (isNil b)} -> BinomialBit a @-}
 bhead :: BinomialHeap a -> BinomialBit a
-bhead (Cons x _) = x
+bhead (Cons a _) = a
 
-{-@ reflect bRank @-}
+-- Example 1: Single Zero bit at rank 0
+{-@ ex1 :: BinomialHeap Int @-}
+ex1 :: BinomialHeap Int
+ex1 = Cons (Zero 0) Nil
+
+-- Example 2: Two bits with consecutive ranks 0, 1
+{-@ ex2 :: BinomialHeap Int @-}
+ex2 :: BinomialHeap Int
+ex2 = Cons (Zero 0) (Cons (Zero 1) Nil)
+
+-- Example 3: Three bits with consecutive ranks 0, 1, 2
+{-@ ex3 :: BinomialHeap Int @-}
+ex3 :: BinomialHeap Int
+ex3 = Cons (Zero 0) (Cons (Zero 1) (Cons (Zero 2) Nil))
+
+-- Example 4: Mix of Zero and One bits with consecutive ranks
+{-@ ex4 :: BinomialHeap Int @-}
+ex4 :: BinomialHeap Int
+ex4 = Cons (One 0 (singleton 1)) (Cons (Zero 1) Nil)
+
+-- Example 5: The original example
+{-@ ex5 :: BinomialHeap Int @-}
+ex5 :: BinomialHeap Int
+ex5 = Cons (Zero 1) Nil
+
+{-@ measure bRank @-}
 {-@ bRank :: BinomialHeap a -> Nat @-}
 bRank :: BinomialHeap a -> Int
 bRank Nil = 0
@@ -238,7 +268,7 @@ addWithCarry Nil (Cons y ys) c =
 addWithCarry (Cons x xs) (Cons y ys) c =
   let (s, c') = bFullAdder x y c
    in case (xs, ys) of
-        (Nil, Nil) -> Cons s Nil
+        (Nil, Nil) -> Cons s (addWithCarry Nil Nil c')
         (Cons x' xs', Nil) -> Cons s (addWithCarry xs Nil c')
         (Nil, Cons y' ys') -> Cons s (addWithCarry Nil ys c')
         (Cons x' xs', Cons y' ys') -> Cons s (addWithCarry xs ys c')
@@ -264,14 +294,61 @@ lemma_rank_preservation x xs c =
   let (s, c') = bFullAdder x (Zero (rank c)) c
    in rank s `seq` ()
 
--- {-@ lemma_addWithCarry_rank :: xs:BinomialHeap a
---                             -> c':{BinomialBit a | rank c' == bRank 0}
---                             -> s:{BinomialBit a | rank s >= 0}
---                             -> {v:() | (not isNil (addWithCarry xs Nil c')) =>
---                                       rank (bhead (addWithCarry xs Nil c')) == rank s + 1}
--- @-}
-lemma_addWithCarry_rank :: (Ord a) => BinomialHeap a -> BinomialBit a -> BinomialBit a -> ()
-lemma_addWithCarry_rank xs c' s =
-  case addWithCarry xs Nil c' of
-    Nil -> ()
-    (Cons h _) -> rank h `seq` ()
+-- -- {-@ lemma_addWithCarry_rank :: xs:BinomialHeap a
+-- --                             -> c':{BinomialBit a | rank c' == bRank 0}
+-- --                             -> s:{BinomialBit a | rank s >= 0}
+-- --                             -> {v:() | (not isNil (addWithCarry xs Nil c')) =>
+-- --                                       rank (bhead (addWithCarry xs Nil c')) == rank s + 1}
+-- -- @-}
+-- lemma_addWithCarry_rank :: (Ord a) => BinomialHeap a -> BinomialBit a -> BinomialBit a -> ()
+-- lemma_addWithCarry_rank xs c' s =
+--   case addWithCarry xs Nil c' of
+--     Nil -> ()
+--     (Cons h _) -> rank h `seq` ()
+
+-- Helper function to check if a heap contains only Zero bits
+{-@ reflect hasOnlyZeros @-}
+{-@ hasOnlyZeros :: BinomialHeap a -> Bool @-}
+hasOnlyZeros :: BinomialHeap a -> Bool
+hasOnlyZeros Nil = True
+hasOnlyZeros (Cons z@(Zero _) bs) = hasOnlyZeros bs
+hasOnlyZeros (Cons (One _ _) _) = False
+
+-- Helper function to get the minimum root value from a heap (reflected function, not a measure)
+{-@ reflect minRootInHeap @-}
+{-@ minRootInHeap :: Ord a => {h:BinomialHeap a | not (hasOnlyZeros h)} -> a @-}
+minRootInHeap :: (Ord a) => BinomialHeap a -> a
+minRootInHeap (Cons (Zero _) bs) = minRootInHeap bs
+minRootInHeap (Cons (One _ (P r _ _)) Nil) = r
+minRootInHeap (Cons (One _ (P r _ _)) bs@(Cons _ _)) =
+  if hasOnlyZeros bs
+    then r
+    else min r (minRootInHeap bs)
+
+{-@ extractMin :: (Ord a) => {h:BinomialHeap a | not (hasOnlyZeros h)}
+                  -> ({p:Pennant a | minRootInHeap h == (root p)}, {h':BinomialHeap a | not (isNil h') => rank (bhead h') == rank (bhead h) }) @-}
+extractMin :: (Ord a) => BinomialHeap a -> (Pennant a, BinomialHeap a)
+extractMin (Cons b Nil) =
+  case b of
+    One _ p -> (p, Nil)
+    _ -> error "Unreachable: hasOnlyZeros implies no One bits"
+extractMin (Cons z@(Zero r) bs@(Cons b tbs)) =
+  if hasOnlyZeros bs
+    then case b of
+      One _ p -> (p, Nil)
+      _ -> error "Unreachable: hasOnlyZeros implies no One bits"
+    else case extractMin bs of
+      (b, bs') -> (b, Cons z bs')
+extractMin (Cons o@(One r p@(P m _ _)) bs@(Cons b tbs)) =
+  if hasOnlyZeros bs
+    then (p, Nil)
+    else case extractMin bs of
+      (p'@(P m' _ _), bs')
+        | m <= m' -> (p, Cons (Zero r) bs)
+        | otherwise -> case bs' of
+            Nil -> (p', Cons o Nil)
+            Cons _ _ -> (p', Cons o bs')
+
+-- ismantle :: (Ord a) => BinTree a -> PList (BinomialBit a)
+-- dismantle Empty = Nil
+-- dismantle (Bin m l r h) = Cons (One h (P m (h - 1) l)) (dismantle r)

@@ -5,7 +5,7 @@ module ExampleTests where
 
 import Control.Exception (SomeException, try)
 import Example
-import Language.Haskell.Liquid.ProofCombinators
+-- import Language.Haskell.Liquid.ProofCombinators
 import Test.Tasty
 import Test.Tasty.HUnit
 
