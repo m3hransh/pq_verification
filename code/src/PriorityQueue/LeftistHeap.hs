@@ -182,6 +182,7 @@ getRestHeap (Min _ h) = h
                             && getMinValue S == heapFindMin H
                             && bag H == B.put (getMinValue S) (bag (getRestHeap S)))
 @-}
+
 {-@ heapSplit :: h:LeftistHeap a -> { s:MinView LeftistHeap a | SplitOK h s }
 @-}
 heapSplit :: (Ord a) => LeftistHeap a -> MinView LeftistHeap a
