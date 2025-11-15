@@ -75,4 +75,28 @@ binomialHeapTests =
               assertEqual "min value" 1 (root minPennant)
               assertEqual "h" (Cons (One 0 (singleton 3)) (Cons (One 1 (link (singleton 1) (singleton 2))) Nil)) h
               assertEqual "remaining heap" (Cons (One 0 (singleton 3)) Nil) restHeap
+    , testCase "dismantle empty tree" $
+        let rev = dismantle Empty :: ReversedBinomialHeap Int
+         in assertEqual "dismantle Empty should be RNil" RNil rev
+    , testCase "dismantle singleton tree" $
+        let tree = Bin 5 Empty Empty 0
+            rev = dismantle tree
+         in do
+              assertEqual "should produce single One bit" (RCons (One 0 (singleton 5)) RNil) rev
+              assertEqual "ranks should decrease" True (isRNil (rtl rev))
+    , testCase "dismantle binomial tree of height 2" $
+        let
+          -- Binomial tree B2 with min element 1
+          tree = Bin 1 (Bin 3 Empty Empty 0) (Bin 2 Empty Empty 0) 1
+          rev = dismantle tree
+         in
+          -- Should produce: One(1, P(1, 1, Bin 3..)) -> One(0, P(2, 0, Empty))
+          do
+            -- First element should have rank 1
+            assertBool "should not be empty" (not (isRNil rev))
+            assertEqual "first rank should be 1" 1 (rank (rbhead rev))
+            -- Second element should have rank 0 (decreasing by 1)
+            let rest = rtl rev
+            assertBool "rest should not be empty" (not (isRNil rest))
+            assertEqual "second rank should be 0" 0 (rank (rbhead rest))
     ]

@@ -131,16 +131,16 @@ rank (One r _) = r
 -- Refined data definition for BinomialHeap that checks only immediate neighbors
 {-@ data BinomialHeap [len] a =
         Nil
-      | Cons { phd :: BinomialBit a
-             , ptl :: {bs : BinomialHeap a | not (isNil bs) => rank ( bhead bs) = (rank phd) + 1}
+      | Cons { hd :: BinomialBit a
+             , tl :: {bs : BinomialHeap a | not (isNil bs) => rank ( bhead bs) = (rank hd) + 1}
              }
 @-}
 -- Plain PList without parameterized invariant
 data BinomialHeap a
   = Nil
   | Cons
-      { phd :: BinomialBit a
-      , ptl :: (BinomialHeap a)
+      { hd :: BinomialBit a
+      , tl :: (BinomialHeap a)
       }
   deriving (Show, Eq)
 
@@ -314,6 +314,39 @@ extractMin (Cons o@(One r p@(P m _ _)) bs@(Cons b tbs)) =
             Nil -> (p', Cons o Nil)
             Cons _ _ -> (p', Cons o bs')
 
--- ismantle :: (Ord a) => BinTree a -> PList (BinomialBit a)
--- dismantle Empty = Nil
--- dismantle (Bin m l r h) = Cons (One h (P m (h - 1) l)) (dismantle r)
+-- Reversed BinomialHeap with decreasing ranks
+{-@ data ReversedBinomialHeap [rlen] a =
+        RNil
+      | RCons { rhd :: BinomialBit a
+              , rtl :: {bs : ReversedBinomialHeap a | not (isRNil bs) => rank (rbhead bs) = (rank rhd) - 1}
+              }
+@-}
+data ReversedBinomialHeap a
+  = RNil
+  | RCons
+      { rhd :: BinomialBit a
+      , rtl :: (ReversedBinomialHeap a)
+      }
+  deriving (Show, Eq)
+
+{-@ measure rlen @-}
+{-@ rlen :: ReversedBinomialHeap a -> Nat @-}
+rlen :: ReversedBinomialHeap a -> Int
+rlen RNil = 0
+rlen (RCons _ t) = 1 + rlen t
+
+{-@ measure isRNil @-}
+{-@ isRNil :: ReversedBinomialHeap a -> Bool @-}
+isRNil :: ReversedBinomialHeap a -> Bool
+isRNil RNil = True
+isRNil _ = False
+
+{-@ measure rbhead @-}
+{-@ rbhead :: {b: ReversedBinomialHeap a | not (isRNil b)} -> BinomialBit a @-}
+rbhead :: ReversedBinomialHeap a -> BinomialBit a
+rbhead (RCons a _) = a
+
+{-@ dismantle :: Ord a => t:BinTree a -> {rh: ReversedBinomialHeap a | (not (isRNil rh)) => rank (rbhead rh) == bheight t} @-}
+dismantle :: (Ord a) => BinTree a -> ReversedBinomialHeap a
+dismantle Empty = RNil
+dismantle (Bin m l r h) = RCons (One h (P m h l)) (dismantle r)
