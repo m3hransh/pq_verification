@@ -350,3 +350,15 @@ rbhead (RCons a _) = a
 dismantle :: (Ord a) => BinTree a -> ReversedBinomialHeap a
 dismantle Empty = RNil
 dismantle (Bin m l r h) = RCons (One h (P m h l)) (dismantle r)
+
+{-@ reverseToBinomialHeap :: rh: ReversedBinomialHeap a -> BinomialHeap a / [rlen rh] @-}
+reverseToBinomialHeap :: ReversedBinomialHeap a -> BinomialHeap a
+reverseToBinomialHeap RNil = Nil
+reverseToBinomialHeap (RCons b bs) = reverseAcc bs (Cons b Nil)
+  where
+    {-@ reverseAcc :: rh: ReversedBinomialHeap a
+                   -> acc:{h: BinomialHeap a | not (isNil h) && ((not (isRNil rh)) => rank (bhead h) == rank (rbhead rh) + 1)}
+                   -> BinomialHeap a / [rlen rh] @-}
+    reverseAcc :: ReversedBinomialHeap a -> BinomialHeap a -> BinomialHeap a
+    reverseAcc RNil acc = acc
+    reverseAcc (RCons b' bs') acc = reverseAcc bs' (Cons b' acc)

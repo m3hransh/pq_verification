@@ -99,4 +99,49 @@ binomialHeapTests =
             let rest = rtl rev
             assertBool "rest should not be empty" (not (isRNil rest))
             assertEqual "second rank should be 0" 0 (rank (rbhead rest))
+    , testCase "reverseToBinomialHeap empty" $
+        let rev = RNil :: ReversedBinomialHeap Int
+            heap = reverseToBinomialHeap rev
+         in assertEqual "reverse empty should be empty" Nil heap
+    , testCase "reverseToBinomialHeap single element" $
+        let rev = RCons (One 0 (singleton 5)) RNil
+            heap = reverseToBinomialHeap rev
+         in assertEqual "reverse single element" (Cons (One 0 (singleton 5)) Nil) heap
+    , testCase "reverseToBinomialHeap two elements with decreasing ranks" $
+        let p0 = singleton (10 :: Int)
+            p1 = link (singleton 5) (singleton 7)
+            rev = RCons (One 1 p1) (RCons (One 0 p0) RNil)
+            heap = reverseToBinomialHeap rev
+         in do
+              assertEqual "heap should not be empty" False (isNil heap)
+              assertEqual "first bit should have rank 0" 0 (rank (bhead heap))
+              assertEqual "second bit should have rank 1" 1 (rank (bhead (tl heap)))
+    , testCase "reverseToBinomialHeap preserves structure" $
+        let
+          -- Create a binomial tree and dismantle it
+          tree = Bin 1 (Bin 3 Empty Empty 0) (Bin 2 Empty Empty 0) 1
+          rev = dismantle tree
+          -- Reverse back to binomial heap
+          heap = reverseToBinomialHeap rev
+         in do
+              assertBool "heap should not be empty" (not (isNil heap))
+              assertEqual "first rank should be 0" 0 (rank (bhead heap))
+              let rest = tl heap
+              assertBool "rest should not be empty" (not (isNil rest))
+              assertEqual "second rank should be 1" 1 (rank (bhead rest))
+    , testCase "reverseToBinomialHeap three elements" $
+        let p0 = singleton (20 :: Int)
+            p1 = link (singleton 10) (singleton 15)
+            p2 = link p1 (link (singleton 5) (singleton 8))
+            rev = RCons (One 2 p2) (RCons (One 1 p1) (RCons (One 0 p0) RNil))
+            heap = reverseToBinomialHeap rev
+         in do
+              assertBool "heap should not be empty" (not (isNil heap))
+              assertEqual "first rank should be 0" 0 (rank (bhead heap))
+              let h1 = tl heap
+              assertBool "h1 should not be empty" (not (isNil h1))
+              assertEqual "second rank should be 1" 1 (rank (bhead h1))
+              let h2 = tl h1
+              assertBool "h2 should not be empty" (not (isNil h2))
+              assertEqual "third rank should be 2" 2 (rank (bhead h2))
     ]
