@@ -3,6 +3,7 @@
 
 module PriorityQueue.BinomialHeapTests where
 
+import PriorityQueue.Base
 import PriorityQueue.BinomialHeap
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -113,9 +114,11 @@ binomialHeapTests =
             rev = RCons (One 1 p1) (RCons (One 0 p0) RNil)
             heap = reverseToBinomialHeap rev
          in do
-              assertEqual "heap should not be empty" False (isNil heap)
+              assertEqual "heap should not be empty" False (heapIsEmpty heap)
               assertEqual "first bit should have rank 0" 0 (rank (bhead heap))
-              assertEqual "second bit should have rank 1" 1 (rank (bhead (tl heap)))
+              case heap of
+                Cons _ (Cons _ _) -> assertEqual "second bit should have rank 1" 1 (rank (bhead (tl heap)))
+                _ -> assertFailure "heap should have at least 2 elements"
     , testCase "reverseToBinomialHeap preserves structure" $
         let
           -- Create a binomial tree and dismantle it
@@ -123,12 +126,15 @@ binomialHeapTests =
           rev = dismantle tree
           -- Reverse back to binomial heap
           heap = reverseToBinomialHeap rev
-         in do
-              assertBool "heap should not be empty" (not (isNil heap))
-              assertEqual "first rank should be 0" 0 (rank (bhead heap))
-              let rest = tl heap
-              assertBool "rest should not be empty" (not (isNil rest))
-              assertEqual "second rank should be 1" 1 (rank (bhead rest))
+         in
+          do
+            assertBool "heap should not be empty" (not (heapIsEmpty heap))
+            assertEqual "first rank should be 0" 0 (rank (bhead heap))
+            case heap of
+              Cons _ rest -> do
+                assertBool "rest should not be empty" (not (heapIsEmpty rest))
+                assertEqual "second rank should be 1" 1 (rank (bhead rest))
+              _ -> assertFailure "heap should not be empty"
     , testCase "reverseToBinomialHeap three elements" $
         let p0 = singleton (20 :: Int)
             p1 = link (singleton 10) (singleton 15)
@@ -136,12 +142,215 @@ binomialHeapTests =
             rev = RCons (One 2 p2) (RCons (One 1 p1) (RCons (One 0 p0) RNil))
             heap = reverseToBinomialHeap rev
          in do
-              assertBool "heap should not be empty" (not (isNil heap))
+              assertBool "heap should not be empty" (not (heapIsEmpty heap))
               assertEqual "first rank should be 0" 0 (rank (bhead heap))
-              let h1 = tl heap
-              assertBool "h1 should not be empty" (not (isNil h1))
-              assertEqual "second rank should be 1" 1 (rank (bhead h1))
-              let h2 = tl h1
-              assertBool "h2 should not be empty" (not (isNil h2))
-              assertEqual "third rank should be 2" 2 (rank (bhead h2))
+              case heap of
+                Cons _ h1 -> do
+                  assertBool "h1 should not be empty" (not (heapIsEmpty h1))
+                  assertEqual "second rank should be 1" 1 (rank (bhead h1))
+                  case h1 of
+                    Cons _ h2 -> do
+                      assertBool "h2 should not be empty" (not (heapIsEmpty h2))
+                      assertEqual "third rank should be 2" 2 (rank (bhead h2))
+                    _ -> assertFailure "h1 should not be empty"
+                _ -> assertFailure "heap should not be empty"
+    , -- PriorityQueue Operations Tests
+      testCase "empty heap is empty" $
+        let heap = empty :: BinomialHeap Int
+         in assertEqual "empty heap should be empty" True (isEmpty heap)
+    , testCase "findMin on empty heap" $
+        let heap = empty :: BinomialHeap Int
+         in assertEqual "findMin on empty should be Nothing" Nothing (findMin heap)
+    , testCase "insert one element" $
+        let heap = insert 5 (empty :: BinomialHeap Int)
+         in do
+              assertEqual "heap should not be empty" False (isEmpty heap)
+              assertEqual "findMin should return the element" (Just 5) (findMin heap)
+    , testCase "insert multiple elements" $
+        let heap = insert 3 $ insert 1 $ insert 5 $ insert 2 (empty :: BinomialHeap Int)
+         in do
+              assertEqual "heap should not be empty" False (isEmpty heap)
+              assertEqual "findMin should return minimum" (Just 1) (findMin heap)
+    , testCase "splitMin on empty heap" $
+        let heap = empty :: BinomialHeap Int
+            result = splitMin heap
+         in assertEqual "splitMin on empty should be EmptyView" EmptyView result
+    , testCase "splitMin on single element heap" $
+        let heap = insert 5 (empty :: BinomialHeap Int)
+            result = splitMin heap
+         in case result of
+              EmptyView -> assertFailure "splitMin should not return EmptyView"
+              Min val rest -> do
+                assertEqual "min value should be 5" 5 val
+                assertEqual "rest should be empty" True (isEmpty rest)
+    , testCase "splitMin removes minimum" $
+        let heap = insert 3 $ insert 1 $ insert 5 (empty :: BinomialHeap Int)
+            result = splitMin heap
+         in case result of
+              EmptyView -> assertFailure "splitMin should not return EmptyView"
+              Min val rest -> do
+                assertEqual "min value should be 1" 1 val
+                assertEqual "rest should not be empty" False (isEmpty rest)
+                assertEqual "findMin of rest should be 3" (Just 3) (findMin rest)
+    , testCase "multiple splitMin operations" $
+        let heap = insert 5 $ insert 2 $ insert 8 $ insert 1 (empty :: BinomialHeap Int)
+            Min v1 h1 = splitMin heap
+            Min v2 h2 = splitMin h1
+            Min v3 h3 = splitMin h2
+            Min v4 h4 = splitMin h3
+         in do
+              assertEqual "first min" 1 v1
+              assertEqual "second min" 2 v2
+              assertEqual "third min" 5 v3
+              assertEqual "fourth min" 8 v4
+              assertEqual "final heap is empty" True (isEmpty h4)
+    , testCase "merge two empty heaps" $
+        let h1 = empty :: BinomialHeap Int
+            h2 = empty :: BinomialHeap Int
+            merged = merge h1 h2
+         in assertEqual "merged heap should be empty" True (isEmpty merged)
+    , testCase "merge empty with non-empty" $
+        let h1 = empty :: BinomialHeap Int
+            h2 = insert 5 $ insert 3 empty
+            merged = merge h1 h2
+         in do
+              assertEqual "merged heap should not be empty" False (isEmpty merged)
+              assertEqual "findMin should be 3" (Just 3) (findMin merged)
+    , testCase "merge non-empty with empty" $
+        let h1 = insert 7 $ insert 2 (empty :: BinomialHeap Int)
+            h2 = empty
+            merged = merge h1 h2
+         in do
+              assertEqual "merged heap should not be empty" False (isEmpty merged)
+              assertEqual "findMin should be 2" (Just 2) (findMin merged)
+    , testCase "merge two non-empty heaps" $
+        let h1 = insert 3 $ insert 7 (empty :: BinomialHeap Int)
+            h2 = insert 2 $ insert 5 empty
+            merged = merge h1 h2
+         in do
+              assertEqual "merged heap should not be empty" False (isEmpty merged)
+              assertEqual "findMin should be 2" (Just 2) (findMin merged)
+    , testCase "merge preserves all elements" $
+        let h1 = insert 4 $ insert 2 (empty :: BinomialHeap Int)
+            h2 = insert 5 $ insert 1 empty
+            merged = merge h1 h2
+            Min v1 m1 = splitMin merged
+            Min v2 m2 = splitMin m1
+            Min v3 m3 = splitMin m2
+            Min v4 m4 = splitMin m3
+         in do
+              assertEqual "first" 1 v1
+              assertEqual "second" 2 v2
+              assertEqual "third" 4 v3
+              assertEqual "fourth" 5 v4
+              assertEqual "final empty" True (isEmpty m4)
+    , testCase "complex sequence of operations" $
+        let h0 = empty :: BinomialHeap Int
+            h1 = insert 10 h0
+            h2 = insert 5 h1
+            h3 = insert 15 h2
+            Min _ h4 = splitMin h3
+            h5 = insert 3 h4
+            h6 = insert 20 h5
+            merged = merge h6 (insert 1 $ insert 7 empty)
+         in do
+              assertEqual "findMin after operations" (Just 1) (findMin merged)
+              let Min _ rest = splitMin merged
+              assertEqual "second min" (Just 3) (findMin rest)
+    , testCase "insert and extract in sorted order" $
+        let heap = foldr insert (empty :: BinomialHeap Int) [9, 2, 7, 1, 8, 5, 3, 6, 4]
+            extract EmptyView acc = reverse acc
+            extract (Min v rest) acc = extract (splitMin rest) (v : acc)
+            sorted = extract (splitMin heap) []
+         in assertEqual "should extract in sorted order" [1, 2, 3, 4, 5, 6, 7, 8, 9] sorted
+    , testCase "stress test - many elements" $
+        let heap = foldr insert (empty :: BinomialHeap Int) [100, 99 .. 1]
+         in do
+              assertEqual "findMin of large heap" (Just 1) (findMin heap)
+              let Min _ rest = splitMin heap
+              assertEqual "second min of large heap" (Just 2) (findMin rest)
+    , testCase "bAdd: two empty heaps" $
+        let h1 = Nil :: BinomialHeap Int
+            h2 = Nil :: BinomialHeap Int
+            result = bAdd h1 h2
+         in assertEqual "bAdd empty heaps should be empty" Nil result
+    , testCase "bAdd: single element heaps" $
+        let h1 = Cons (One 0 (singleton 5)) Nil :: BinomialHeap Int
+            h2 = Cons (One 0 (singleton 3)) Nil :: BinomialHeap Int
+            result = bAdd h1 h2
+         in do
+              assertEqual "should not be all zeros" False (hasOnlyZeros result)
+              assertEqual "min should be 3" 3 (minRootInHeap result)
+    , testCase "bAdd: with empty heap" $
+        let h1 = Cons (One 0 (singleton 5)) Nil :: BinomialHeap Int
+            h2 = Nil :: BinomialHeap Int
+            result = bAdd h1 h2
+         in do
+              assertEqual "result should equal h1" h1 result
+              assertEqual "min should be 5" 5 (minRootInHeap result)
+    , testCase "bAdd: empty with non-empty" $
+        let h1 = Nil :: BinomialHeap Int
+            h2 = Cons (One 0 (singleton 7)) Nil :: BinomialHeap Int
+            result = bAdd h1 h2
+         in do
+              assertEqual "should not be all zeros" False (hasOnlyZeros result)
+              assertEqual "min should be 7" 7 (minRootInHeap result)
+              -- Verify element is present
+              let Min v h' = splitMin result
+              assertEqual "extracted value is 7" 7 v
+              assertEqual "heap is empty after extraction" True (isEmpty h')
+    , testCase "bAdd: heap with Zero bit and single element" $
+        let h1 = Cons (Zero 0) (Cons (One 1 (link (singleton 1) (singleton 2))) Nil) :: BinomialHeap Int
+            h2 = Cons (One 0 (singleton 3)) Nil :: BinomialHeap Int
+            result = bAdd h1 h2
+         in do
+              assertEqual "should not be all zeros" False (hasOnlyZeros result)
+              assertEqual "min should be 1" 1 (minRootInHeap result)
+              -- Verify all three elements are present
+              let Min v1 h' = splitMin result
+              assertEqual "first min is 1" 1 v1
+              let Min v2 h'' = splitMin h'
+              assertEqual "second min is 2" 2 v2
+              let Min v3 h''' = splitMin h''
+              assertEqual "third min is 3" 3 v3
+    , testCase "bAdd: carry propagation bug" $
+        let h1 = Cons (One 0 (singleton 1)) (Cons (One 1 (link (singleton 3) (singleton 4))) Nil) :: BinomialHeap Int
+            h2 = Cons (One 0 (singleton 2)) Nil :: BinomialHeap Int
+            result = bAdd h1 h2
+         in do
+              -- BUG: This currently fails! The result has only zeros
+              assertEqual "should not be all zeros (BUG!)" False (hasOnlyZeros result)
+              -- Should contain all 4 elements: 1, 2, 3, 4
+              let Min v1 h' = splitMin result
+              assertEqual "first min is 1" 1 v1
+              let Min v2 h'' = splitMin h'
+              assertEqual "second min is 2" 2 v2
+              let Min v3 h''' = splitMin h''
+              assertEqual "third min is 3" 3 v3
+              let Min v4 h4 = splitMin h'''
+              assertEqual "fourth min is 4" 4 v4
+              assertEqual "heap should be empty after 4 extractions" True (isEmpty h4)
+    , testCase "bAdd: three elements" $
+        let h1 = Cons (One 0 (singleton 1)) Nil :: BinomialHeap Int
+            h2 = Cons (One 0 (singleton 2)) Nil :: BinomialHeap Int
+            h12 = bAdd h1 h2
+            h3 = Cons (One 0 (singleton 3)) Nil :: BinomialHeap Int
+            result = bAdd h12 h3
+         in do
+              assertEqual "should not be all zeros" False (hasOnlyZeros result)
+              assertEqual "min should be 1" 1 (minRootInHeap result)
+              -- Verify all three elements
+              let Min v1 h' = splitMin result
+              assertEqual "first min is 1" 1 v1
+              let Min v2 h'' = splitMin h'
+              assertEqual "second min is 2" 2 v2
+              let Min v3 h''' = splitMin h''
+              assertEqual "third min is 3" 3 v3
+    , testCase "bAdd: multiple carries" $
+        let h1 = Cons (One 0 (singleton 1)) (Cons (One 1 (link (singleton 2) (singleton 3))) (Cons (One 2 (link (link (singleton 4) (singleton 5)) (link (singleton 6) (singleton 7)))) Nil)) :: BinomialHeap Int
+            h2 = Cons (One 0 (singleton 8)) (Cons (One 1 (link (singleton 9) (singleton 10))) (Cons (One 2 (link (link (singleton 11) (singleton 12)) (link (singleton 13) (singleton 14)))) Nil)) :: BinomialHeap Int
+            result = bAdd h1 h2
+         in do
+              assertEqual "should not be all zeros" False (hasOnlyZeros result)
+              assertEqual "min should be 1" 1 (minRootInHeap result)
     ]

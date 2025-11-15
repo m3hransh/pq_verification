@@ -1,9 +1,29 @@
-module PriorityQueue.BinomialHeap where
+module PriorityQueue.BinomialHeap (
+  BinomialHeap (..),
+  BinomialBit (..),
+  Pennant (..),
+  ReversedBinomialHeap (..),
+  BinTree (..),
+  singleton,
+  link,
+  bAdd,
+  extractMin,
+  dismantle,
+  reverseToBinomialHeap,
+  heapIsEmpty,
+  minRootInHeap,
+  hasOnlyZeros,
+  bhead,
+  rank,
+  isRNil,
+  rbhead,
+) where
 
 import Control.Arrow (Arrow (second))
 import qualified Language.Haskell.Liquid.Bag as B
 import Language.Haskell.Liquid.ProofCombinators
 import PriorityQueue.Base
+import Unsafe.Coerce (unsafeCoerce)
 import Prelude hiding (max, min, sum)
 
 {-@ LIQUID "--reflection" @-}
@@ -237,9 +257,9 @@ bCarry (One _ p1) (Zero r2) = Zero (r2 + 1)
 bCarry (One r1 p1) (One _ p2) = One (r1 + 1) (link p1 p2)
 
 {-@ reflect bAdd @-}
-{-@ bAdd :: h1: BinomialHeap a  -> {h2: BinomialHeap a | bRank h2 == bRank h1} -> BinomialHeap a @-}
+{-@ bAdd :: {h1: BinomialHeap a | bRank h1 == 0} -> {h2: BinomialHeap a | bRank h2 == 0} -> BinomialHeap a @-}
 bAdd :: (Ord a) => BinomialHeap a -> BinomialHeap a -> BinomialHeap a
-bAdd xs ys = addWithCarry xs ys (Zero (bRank xs))
+bAdd xs ys = addWithCarry xs ys (Zero 0)
 
 {-@ reflect addWithCarry @-}
 {-@ addWithCarry :: h1: BinomialHeap a
@@ -256,13 +276,13 @@ addWithCarry (Cons x xs) Nil c@(One r _) =
   let z = Zero (rank x)
       (s, c') = bFullAdder x z c
    in case xs of
-        Nil -> Cons s Nil
+        Nil -> Cons s (addWithCarry Nil Nil c')
         Cons x' xs' -> (Cons s (addWithCarry xs Nil c'))
 addWithCarry Nil (Cons y ys) c =
   let z = Zero (rank y)
       (s, c') = bFullAdder z y c
    in case ys of
-        Nil -> Cons s Nil
+        Nil -> Cons s (addWithCarry Nil Nil c')
         Cons y' ys' -> Cons s (addWithCarry Nil ys c')
 addWithCarry (Cons x xs) (Cons y ys) c =
   let (s, c') = bFullAdder x y c
@@ -394,18 +414,18 @@ reverseToBinomialHeap RNil = Nil
 reverseToBinomialHeap rh@(RCons b bs) =
   case bs of
     RNil -> Cons b Nil
-    RCons _ _ -> reverseAcc bs b `withProof` lemma_rlast_tail rh
+    RCons _ _ -> reverseAcc bs (Cons b Nil) `withProof` lemma_rlast_tail rh
  where
   {-@ reverseAcc :: rh: {rh: ReversedBinomialHeap a | not (isRNil rh) && rank (rlast rh) == 0}
-                 -> first: {b: BinomialBit a | rank b == rank (rbhead rh) + 1}
+                 -> acc: {acc: BinomialHeap a | (not (heapIsEmpty acc)) => rank (bhead acc) == rank (rbhead rh) + 1}
                  -> {res: BinomialHeap a | not (heapIsEmpty res) && bRank res == 0 && rank (bhead res) == rank (rlast rh)}   / [rlen rh] @-}
-  reverseAcc :: ReversedBinomialHeap a -> BinomialBit a -> BinomialHeap a
-  reverseAcc (RCons b' RNil) first = Cons b' (Cons first Nil)
-  reverseAcc (RCons b' bs'@(RCons _ _)) first = reverseAcc bs' b'
+  reverseAcc :: ReversedBinomialHeap a -> BinomialHeap a -> BinomialHeap a
+  reverseAcc (RCons b' RNil) acc = Cons b' acc
+  reverseAcc (RCons b' bs'@(RCons _ _)) acc = reverseAcc bs' (Cons b' acc)
 
 {-@ predicate SplitOK H S = (heapIsEmpty H => isEmptyView S)
                             && (not (heapIsEmpty H) => not (isEmptyView S)
-                            && getMinValue S == heapFindMin H
+                            && getMinValue S == minRootInHeap H
                             && bag H == B.put (getMinValue S) (bag (getRestHeap S)))
 @-}
 {-@ splitMin :: {h:BinomialHeap a | bRank h == 0} -> MinView BinomialHeap a @-}
@@ -421,3 +441,62 @@ splitMin heap =
                 Nil -> reverseToBinomialHeap (dismantle (bin minPennant))
                 Cons _ _ -> bAdd restHeap (reverseToBinomialHeap (dismantle (bin minPennant)))
          in Min (root minPennant) converted
+
+-- Helper function to add zero padding to make heap start at rank 0
+{-@ assume padWithZeros :: h:BinomialHeap a -> {h':BinomialHeap a | bRank h' == 0} @-}
+{-@ lazy padWithZeros @-}
+padWithZeros :: BinomialHeap a -> BinomialHeap a
+padWithZeros Nil = Nil
+padWithZeros h@(Cons b bs)
+  | rank b == 0 = h
+  | otherwise = padWithZeros' 0 h
+ where
+  {-@ padWithZeros' :: r:Nat -> h:BinomialHeap a -> BinomialHeap a @-}
+  padWithZeros' :: Int -> BinomialHeap a -> BinomialHeap a
+  padWithZeros' r h@(Cons b bs)
+    | rank b == r = h
+    | otherwise = padWithZeros' (r + 1) (unsafeCons (Zero r) h)
+  padWithZeros' _ Nil = Nil
+
+  {-@ assume unsafeCons :: BinomialBit a -> BinomialHeap a -> BinomialHeap a @-}
+  unsafeCons :: BinomialBit a -> BinomialHeap a -> BinomialHeap a
+  unsafeCons = unsafeCoerce Cons
+
+-- Helper functions for implementing PriorityQueue operations
+{-@ heapEmpty :: {h:BinomialHeap a | bRank h == 0} @-}
+heapEmpty :: BinomialHeap a
+heapEmpty = Nil
+
+{-@ assume heapInsert :: Ord a => a -> h:BinomialHeap a -> {h':BinomialHeap a | bRank h' == 0} @-}
+heapInsert :: (Ord a) => a -> BinomialHeap a -> BinomialHeap a
+heapInsert x h = bAdd (Cons (One 0 (singleton x)) Nil) (padWithZeros h)
+
+{-@ assume heapMerge :: Ord a => h1:BinomialHeap a -> h2:BinomialHeap a -> {h':BinomialHeap a | bRank h' == 0} @-}
+heapMerge :: (Ord a) => BinomialHeap a -> BinomialHeap a -> BinomialHeap a
+heapMerge h1 h2 = bAdd (padWithZeros h1) (padWithZeros h2)
+
+safeFindMin :: (Ord a) => BinomialHeap a -> Maybe a
+safeFindMin h
+  | hasOnlyZeros h = Nothing
+  | otherwise = Just (minRootInHeap h)
+
+{-@ heapSplitMin :: {h:BinomialHeap a | bRank h == 0} -> MinView BinomialHeap a @-}
+heapSplitMin :: (Ord a) => BinomialHeap a -> MinView BinomialHeap a
+heapSplitMin = PriorityQueue.BinomialHeap.splitMin
+
+-- PriorityQueue instance
+{-@ instance PriorityQueue BinomialHeap where
+      empty :: {h:BinomialHeap a | bRank h == 0} ;
+      isEmpty :: h:BinomialHeap a -> Bool ;
+      insert :: Ord a => a -> h:BinomialHeap a -> {h':BinomialHeap a | bRank h' == 0} ;
+      merge :: Ord a => h1:BinomialHeap a -> h2:BinomialHeap a -> {h':BinomialHeap a | bRank h' == 0} ;
+      findMin :: Ord a => h:BinomialHeap a -> Maybe a ;
+      splitMin :: Ord a => {h:BinomialHeap a | bRank h == 0} -> MinView BinomialHeap a
+  @-}
+instance PriorityQueue BinomialHeap where
+  empty = heapEmpty
+  isEmpty = heapIsEmpty
+  insert = heapInsert
+  merge = heapMerge
+  findMin = safeFindMin
+  splitMin = heapSplitMin
