@@ -30,23 +30,29 @@ import Prelude hiding (max, min, sum)
 {-@ LIQUID "--ple" @-}
 
 {-@ reflect max @-}
-{-@ max:: forall <p :: Int -> Bool> . Int <p> -> Int<p> -> Int<p> @-}
+{-@ max :: forall <p :: Int -> Bool>.
+           Int<p> -> Int<p> -> Int<p> @-}
 max :: Int -> Int -> Int
 max x y = if x > y then x else y
 
 {-@ reflect min @-}
-{-@ min:: (Ord a) => a -> a -> a @-}
+{-@ min :: Ord a => a -> a -> a @-}
 min :: (Ord a) => a -> a -> a
 min x y = if x <= y then x else y
 
 -- Binary tree with heap property
 {-@ reflect isLowerBound @-}
-{-@ isLowerBound :: Ord a => v:a -> t:BinTree a -> Bool @-}
+{-@ isLowerBound :: Ord a =>
+      v:a -> t:BinTree a -> Bool @-}
 isLowerBound :: (Ord a) => a -> BinTree a -> Bool
 isLowerBound _ Empty = True
-isLowerBound v (Bin x l r _) = v <= x && isLowerBound v l && isLowerBound v r
+isLowerBound v (Bin x l r _) =
+  v <= x && isLowerBound v l && isLowerBound v r
 
-{-@ lemma_isLowerBound_transitive :: x:a -> y:{a | x <= y} -> t:{BinTree a | isLowerBound y t} -> {isLowerBound x t} @-}
+{-@ lemma_isLowerBound_transitive :: Ord a =>
+      x:a -> y:{a | x <= y} ->
+      t:{BinTree a | isLowerBound y t} ->
+      {isLowerBound x t} @-}
 lemma_isLowerBound_transitive ::
   (Ord a) => a -> a -> BinTree a -> Proof
 lemma_isLowerBound_transitive x y Empty = ()
@@ -54,15 +60,18 @@ lemma_isLowerBound_transitive x y (Bin z l r _) =
   lemma_isLowerBound_transitive x y l
     &&& lemma_isLowerBound_transitive x y r
 
-{-@ type BinTreeHeight a H = { t : BinTree a | bheight t == H } @-}
+{-@ type BinTreeHeight a H =
+      {t:BinTree a | bheight t == H} @-}
 
-{-@ type BinTreeBound a X = {b : BinTree a | isLowerBound X b} @-}
+{-@ type BinTreeBound a X =
+      {b:BinTree a | isLowerBound X b} @-}
+
 {-@ data BinTree a = Empty
-      | Bin { value :: a
-          ,left  :: BinTreeBound a value
-          ,right :: BinTreeHeight a (bheight left)
-          ,height :: {h : Nat | h == 1 + bheight right}
-           }
+      | Bin { value  :: a
+            , left   :: BinTreeBound a value
+            , right  :: BinTreeHeight a (bheight left)
+            , height :: {h:Nat | h == 1 + bheight right}
+            }
   @-}
 data BinTree a
   = Empty
@@ -82,15 +91,17 @@ treeHeight (Bin _ l r _) = 1 + max (treeHeight l) (treeHeight r)
 {-@ invariant {t:BinTree a | height t = treeHeight t} @-}
 
 {-@ measure bheight @-}
-{-@ bheight :: BinTree a -> {v: Int | v >= -1} @-}
+{-@ bheight :: BinTree a -> {v:Int | v >= -1} @-}
 bheight :: BinTree a -> Int
 bheight Empty = -1
 bheight (Bin _ _ _ h) = h
 
-{-@ data Pennant a = P { root :: a
-           ,pheight  :: Nat
-           ,bin   :: {b : BinTreeBound a root | bheight b + 1 = pheight}
-           }
+{-@ data Pennant a =
+      P { root    :: a
+        , pheight :: Nat
+        , bin     :: {b:BinTreeBound a root |
+                      bheight b + 1 == pheight}
+        }
   @-}
 data Pennant a
   = P
@@ -103,7 +114,8 @@ data Pennant a
 pennantExample :: Pennant Int
 pennantExample = P 3 2 (Bin 4 (Bin 7 Empty Empty 0) (Bin 3 Empty Empty 0) 1)
 
-{-@ singleton :: Ord a => a -> {v:Pennant a | pheight v == 0} @-}
+{-@ singleton :: Ord a =>
+      a -> {v:Pennant a | pheight v == 0} @-}
 singleton :: (Ord a) => a -> Pennant a
 singleton x = P x 0 Empty
 
@@ -135,10 +147,15 @@ hbag :: (Ord a) => BinomialHeap a -> B.Bag a
 hbag Nil = B.empty
 hbag (Cons b h) = B.union (bbag b) (hbag h)
 
-{-@ predicate BagUnion H1 H2 H = (pBag H == B.union (pBag H1) (pBag H2)) @-}
+{-@ predicate BagUnion H1 H2 H =
+      pBag H == B.union (pBag H1) (pBag H2) @-}
 
-{-@reflect link @-}
-{-@ link :: Ord a => t1: Pennant a -> t2: {t : Pennant a | pheight t == pheight t1} -> {v: Pennant a| pheight v == pheight t1 + 1 && BagUnion t1 t2 v} @-}
+{-@ reflect link @-}
+{-@ link :: Ord a =>
+      p1:Pennant a ->
+      p2:{Pennant a | pheight p2 == pheight p1} ->
+      {v:Pennant a | pheight v == pheight p1 + 1
+                  && BagUnion p1 p2 v} @-}
 link :: (Ord a) => Pennant a -> Pennant a -> Pennant a
 link (P x1 s1 t1) (P x2 s2 t2)
   | x1 <= x2 = (P x1 (s1 + 1) ((Bin x2 t2 t1 (s1)) `withProof` (lemma_isLowerBound_transitive x1 x2 t2)))
@@ -160,6 +177,9 @@ binTree = One 2 (P 3 2 (Bin 4 (Bin 7 Empty Empty 0) (Bin 3 Empty Empty 0) 1))
 rank :: BinomialBit a -> Int
 rank (Zero r) = r
 rank (One r _) = r
+
+{-@ type BitRank a N =
+      {b:BinomialBit a | rank b == N} @-}
 
 -- Refined data definition for BinomialHeap that checks only immediate neighbors
 {-@ data BinomialHeap [len] a =
@@ -190,7 +210,9 @@ heapIsEmpty Nil = True
 heapIsEmpty _ = False
 
 {-@ measure bhead @-}
-{-@ bhead :: {b: BinomialHeap a| not (heapIsEmpty b)} -> BinomialBit a @-}
+{-@ bhead ::
+      {b:BinomialHeap a | not (heapIsEmpty b)} ->
+      BinomialBit a @-}
 bhead :: BinomialHeap a -> BinomialBit a
 bhead (Cons a _) = a
 
@@ -269,8 +291,8 @@ bCarry (One _ p1) (Zero r2) = Zero (r2 + 1)
 bCarry (One r1 p1) (One _ p2) = One (r1 + 1) (link p1 p2)
 
 {-@ reflect bAdd @-}
-{-@ bAdd :: h1: {h1: BinomialHeap a | bRank h1 == 0} 
-         -> h2: {h2: BinomialHeap a | bRank h2 == 0} 
+{-@ bAdd :: h1: {h1: BinomialHeap a | bRank h1 == 0}
+         -> h2: {h2: BinomialHeap a | bRank h2 == 0}
          -> BinomialHeap a @-}
 bAdd :: (Ord a) => BinomialHeap a -> BinomialHeap a -> BinomialHeap a
 bAdd xs ys = addWithCarry xs ys (Zero 0)
@@ -316,7 +338,8 @@ hasOnlyZeros (Cons (One _ _) _) = False
 
 -- Helper function to get the minimum root value from a heap (reflected function, not a measure)
 {-@ reflect minRootInHeap @-}
-{-@ minRootInHeap :: Ord a => {h:BinomialHeap a | not (hasOnlyZeros h)} -> a @-}
+{-@ minRootInHeap :: Ord a =>
+      h:{BinomialHeap a | not (hasOnlyZeros h)} -> a @-}
 minRootInHeap :: (Ord a) => BinomialHeap a -> a
 minRootInHeap (Cons (Zero _) bs) = minRootInHeap bs
 minRootInHeap (Cons (One _ (P r _ _)) Nil) = r
@@ -405,8 +428,16 @@ lemma_rlast_tail :: ReversedBinomialHeap a -> Proof
 lemma_rlast_tail (RCons b (RCons b' RNil)) = ()
 lemma_rlast_tail (RCons b rh@(RCons b' (RCons _ _))) = lemma_rlast_tail rh
 
+{-@ predicate ValidDismantle T RH =
+      (bheight T >= 0 => not (isRNil RH))
+      && (not (isRNil RH) =>
+          rank (rbhead RH) == bheight T
+          && rank (rlast RH) == 0) @-}
+
 {-@ reflect dismantle @-}
-{-@ dismantle :: Ord a => t:BinTree a -> {rh: ReversedBinomialHeap a | (bheight t >= 0 => not (isRNil rh)) && ((not (isRNil rh)) => (rank (rbhead rh) == bheight t && rank (rlast rh) == 0))} @-}
+{-@ dismantle :: Ord a =>
+      t:BinTree a ->
+      {rh:ReversedBinomialHeap a | ValidDismantle t rh} @-}
 dismantle :: (Ord a) => BinTree a -> ReversedBinomialHeap a
 dismantle Empty = RNil
 dismantle (Bin m l r h) =
@@ -433,7 +464,19 @@ getMinValue (Min x _) = x
 getRestHeap :: MinView q a -> q a
 getRestHeap (Min _ h) = h
 
-{-@ reverseToBinomialHeap :: rh: {rh: ReversedBinomialHeap a | (not (isRNil rh)) => rank (rlast rh) == 0} -> {h: BinomialHeap a | ((not (isRNil rh)) => (not (heapIsEmpty h) && rank (bhead h) == rank (rlast rh) && bRank h == 0))} / [rlen rh] @-}
+{-@ predicate ReversedEndsAtZero RH =
+      not (isRNil RH) => rank (rlast RH) == 0 @-}
+
+{-@ predicate ValidReversed RH H =
+      not (isRNil RH) =>
+        not (heapIsEmpty H)
+        && rank (bhead H) == rank (rlast RH)
+        && bRank H == 0 @-}
+
+{-@ reverseToBinomialHeap ::
+      rh:{ReversedBinomialHeap a | ReversedEndsAtZero rh} ->
+      {h:BinomialHeap a | ValidReversed rh h}
+      / [rlen rh] @-}
 reverseToBinomialHeap :: ReversedBinomialHeap a -> BinomialHeap a
 reverseToBinomialHeap RNil = Nil
 reverseToBinomialHeap rh@(RCons b bs) =
@@ -441,18 +484,28 @@ reverseToBinomialHeap rh@(RCons b bs) =
     RNil -> Cons b Nil
     RCons _ _ -> reverseAcc bs (Cons b Nil) `withProof` lemma_rlast_tail rh
  where
-  {-@ reverseAcc :: rh: {rh: ReversedBinomialHeap a | not (isRNil rh) && rank (rlast rh) == 0}
-                 -> acc: {acc: BinomialHeap a | (not (heapIsEmpty acc)) => rank (bhead acc) == rank (rbhead rh) + 1}
-                 -> {res: BinomialHeap a | not (heapIsEmpty res) && bRank res == 0 && rank (bhead res) == rank (rlast rh)}   / [rlen rh] @-}
+  {-@ reverseAcc ::
+        rh:{ReversedBinomialHeap a | ReversedEndsAtZero rh
+                                   && not (isRNil rh)} ->
+        acc:{BinomialHeap a |
+             not (heapIsEmpty acc) =>
+               rank (bhead acc) == rank (rbhead rh) + 1} ->
+        {res:BinomialHeap a | not (heapIsEmpty res)
+                           && bRank res == 0
+                           && rank (bhead res) == rank (rlast rh)}
+        / [rlen rh] @-}
   reverseAcc :: ReversedBinomialHeap a -> BinomialHeap a -> BinomialHeap a
   reverseAcc (RCons b' RNil) acc = Cons b' acc
   reverseAcc (RCons b' bs'@(RCons _ _)) acc = reverseAcc bs' (Cons b' acc)
 
-{-@ predicate SplitOK H S = (heapIsEmpty H => isEmptyView S)
-                            && (not (heapIsEmpty H) => not (isEmptyView S)
-                            && getMinValue S == minRootInHeap H)
-@-}
-{-@ splitMin :: h:{h:BinomialHeap a | bRank h == 0} -> MinView BinomialHeap a @-}
+{-@ predicate SplitOK H S =
+      (heapIsEmpty H => isEmptyView S)
+      && (not (heapIsEmpty H) =>
+          not (isEmptyView S)
+          && getMinValue S == minRootInHeap H) @-}
+{-@ splitMin ::
+      h:{BinomialHeap a | bRank h == 0} ->
+      MinView BinomialHeap a @-}
 splitMin :: (Ord a) => BinomialHeap a -> MinView BinomialHeap a
 splitMin heap =
   if hasOnlyZeros heap
@@ -467,7 +520,9 @@ splitMin heap =
          in Min (root minPennant) converted
 
 -- Helper function to add zero padding to make heap start at rank 0
-{-@ assume padWithZeros :: h:BinomialHeap a -> {h':BinomialHeap a | bRank h' == 0} @-}
+{-@ assume padWithZeros ::
+      h:BinomialHeap a ->
+      {h':BinomialHeap a | bRank h' == 0} @-}
 {-@ lazy padWithZeros @-}
 padWithZeros :: BinomialHeap a -> BinomialHeap a
 padWithZeros Nil = Nil
@@ -487,15 +542,20 @@ padWithZeros h@(Cons b bs)
   unsafeCons = unsafeCoerce Cons
 
 -- Helper functions for implementing PriorityQueue operations
-{-@ heapEmpty :: {h:BinomialHeap a | bRank h == 0} @-}
+{-@ heapEmpty ::
+      {h:BinomialHeap a | bRank h == 0} @-}
 heapEmpty :: BinomialHeap a
 heapEmpty = Nil
 
-{-@ assume heapInsert :: Ord a => a -> h:BinomialHeap a -> {h':BinomialHeap a | bRank h' == 0} @-}
+{-@ assume heapInsert :: Ord a =>
+      a -> h:BinomialHeap a ->
+      {h':BinomialHeap a | bRank h' == 0} @-}
 heapInsert :: (Ord a) => a -> BinomialHeap a -> BinomialHeap a
 heapInsert x h = bAdd (Cons (One 0 (singleton x)) Nil) (padWithZeros h)
 
-{-@ assume heapMerge :: Ord a => h1:BinomialHeap a -> h2:BinomialHeap a -> {h':BinomialHeap a | bRank h' == 0} @-}
+{-@ assume heapMerge :: Ord a =>
+      h1:BinomialHeap a -> h2:BinomialHeap a ->
+      {h':BinomialHeap a | bRank h' == 0} @-}
 heapMerge :: (Ord a) => BinomialHeap a -> BinomialHeap a -> BinomialHeap a
 heapMerge h1 h2 = bAdd (padWithZeros h1) (padWithZeros h2)
 
@@ -504,18 +564,29 @@ safeFindMin h
   | hasOnlyZeros h = Nothing
   | otherwise = Just (minRootInHeap h)
 
-{-@ heapSplitMin :: {h:BinomialHeap a | bRank h == 0} -> MinView BinomialHeap a @-}
+{-@ heapSplitMin ::
+      {h:BinomialHeap a | bRank h == 0} ->
+      MinView BinomialHeap a @-}
 heapSplitMin :: (Ord a) => BinomialHeap a -> MinView BinomialHeap a
 heapSplitMin = PriorityQueue.BinomialHeap.splitMin
 
 -- PriorityQueue instance
 {-@ instance PriorityQueue BinomialHeap where
-      empty :: {h:BinomialHeap a | bRank h == 0} ;
-      isEmpty :: h:BinomialHeap a -> Bool ;
-      insert :: Ord a => a -> h:BinomialHeap a -> {h':BinomialHeap a | bRank h' == 0} ;
-      merge :: Ord a => h1:BinomialHeap a -> h2:BinomialHeap a -> {h':BinomialHeap a | bRank h' == 0} ;
-      findMin :: Ord a => h:BinomialHeap a -> Maybe a ;
-      splitMin :: Ord a => {h:BinomialHeap a | bRank h == 0} -> MinView BinomialHeap a
+      empty ::
+        {h:BinomialHeap a | bRank h == 0} ;
+      isEmpty ::
+        h:BinomialHeap a -> Bool ;
+      insert :: Ord a =>
+        a -> h:BinomialHeap a ->
+        {h':BinomialHeap a | bRank h' == 0} ;
+      merge :: Ord a =>
+        h1:BinomialHeap a -> h2:BinomialHeap a ->
+        {h':BinomialHeap a | bRank h' == 0} ;
+      findMin :: Ord a =>
+        h:BinomialHeap a -> Maybe a ;
+      splitMin :: Ord a =>
+        {h:BinomialHeap a | bRank h == 0} ->
+        MinView BinomialHeap a
   @-}
 instance PriorityQueue BinomialHeap where
   empty = heapEmpty
