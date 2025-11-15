@@ -220,7 +220,7 @@ bHalfAdder b1 b2 = (bSum b1 b2, bCarry b1 b2)
 {-@ bFullAdder :: b1: BinomialBit a
                -> b2: {b: BinomialBit a | rank b == rank b1}
                -> c: {b: BinomialBit a | rank b == rank b1}
-               -> (BinomialBit a, BinomialBit a)<{\s co -> rank s == rank b1 && rank co == rank b1 + 1}> @-}
+               -> ({s: BinomialBit a | rank s == rank b1} , {co: BinomialBit a | rank co == rank b1 + 1}) @-}
 bFullAdder :: (Ord a) => BinomialBit a -> BinomialBit a -> BinomialBit a -> (BinomialBit a, BinomialBit a)
 bFullAdder b1 b2 c =
   let (s, c1) = bHalfAdder b1 b2
@@ -242,9 +242,10 @@ bAdd xs ys = addWithCarry xs ys (Zero 0)
 
 {-@ reflect addWithCarry @-}
 {-@ addWithCarry :: h1: BinomialHeap a
-                  -> {h2: BinomialHeap a |  (bRank h2 == bRank h1 || isNil h1) || isNil h2 }
-                  -> carry: { c : BinomialBit a | ((not isNil h1) => rank carry == bRank h1) && ((not isNil h2) => rank carry == bRank h2)}
-                  -> {b: BinomialHeap a | ((not isNil h1) => rank carry == bRank h1) && ((not isNil h2) => rank carry == bRank h2)} / [len h1, len h2, 0]@-}
+                       -> {h2: BinomialHeap a | (bRank h2 == bRank h1 || isNil h1) || isNil h2 }
+                       -> carry: { c : BinomialBit a | ((not isNil h1) => rank carry == bRank h1) && ((not isNil h2) => rank carry == bRank h2)}
+                       -> {b: BinomialHeap a | (not isNil b) => rank (bhead b) == rank carry} / [len h1, len h2]
+     @-}
 addWithCarry :: (Ord a) => BinomialHeap a -> BinomialHeap a -> BinomialBit a -> BinomialHeap a
 addWithCarry Nil Nil c
   | c == (Zero 0) = Nil
@@ -253,12 +254,9 @@ addWithCarry (Cons x xs) Nil (Zero r) = Cons x xs
 addWithCarry (Cons x xs) Nil c@(One r _) =
   let z = Zero (rank x)
       (s, c') = bFullAdder x z c
-   in -- c' has rank (rank x + 1)
-      -- If xs = Cons x' xs', then from PList invariant: rank x == rank x' - 1
-      -- So rank x' == rank x + 1, and bRank xs == rank x' == rank x + 1 == rank c'
-      case xs of
+   in case xs of
         Nil -> Cons s Nil
-        Cons x' xs' -> (lemma_rank_preservation x xs c) `seq` (Cons s (addWithCarry xs Nil c'))
+        Cons x' xs' -> (Cons s (addWithCarry xs Nil c'))
 addWithCarry Nil (Cons y ys) c =
   let z = Zero (rank y)
       (s, c') = bFullAdder z y c
@@ -272,39 +270,6 @@ addWithCarry (Cons x xs) (Cons y ys) c =
         (Cons x' xs', Nil) -> Cons s (addWithCarry xs Nil c')
         (Nil, Cons y' ys') -> Cons s (addWithCarry Nil ys c')
         (Cons x' xs', Cons y' ys') -> Cons s (addWithCarry xs ys c')
-
-{-@ lemma_sum_rank :: x:{BinomialBit a | rank x >= 0}
-                  -> y:{BinomialBit a | rank y >= 0 && rank y == rank x}
-                  -> c:{BinomialBit a | rank c >= 0 && rank c == rank x}
-                   -> { rank (fst (bFullAdder x y c)) == rank x}
-@-}
-lemma_sum_rank :: (Ord a) => BinomialBit a -> BinomialBit a -> BinomialBit a -> ()
-lemma_sum_rank x y c =
-  let (s, c') = bFullAdder x y c
-   in rank s `seq` ()
-
-{-@ reflect lemma_rank_preservation @-}
-{-@ lemma_rank_preservation :: x:{BinomialBit a | rank x >= 0}
-                            -> xs: BinomialHeap a
-                            -> c:{BinomialBit a | rank c >= 0 && rank c == rank x}
-                            -> { rank (fst (bFullAdder x (Zero (rank c)) c)) == rank x }
-@-}
-lemma_rank_preservation :: (Ord a) => BinomialBit a -> BinomialHeap a -> BinomialBit a -> ()
-lemma_rank_preservation x xs c =
-  let (s, c') = bFullAdder x (Zero (rank c)) c
-   in rank s `seq` ()
-
--- -- {-@ lemma_addWithCarry_rank :: xs:BinomialHeap a
--- --                             -> c':{BinomialBit a | rank c' == bRank 0}
--- --                             -> s:{BinomialBit a | rank s >= 0}
--- --                             -> {v:() | (not isNil (addWithCarry xs Nil c')) =>
--- --                                       rank (bhead (addWithCarry xs Nil c')) == rank s + 1}
--- -- @-}
--- lemma_addWithCarry_rank :: (Ord a) => BinomialHeap a -> BinomialBit a -> BinomialBit a -> ()
--- lemma_addWithCarry_rank xs c' s =
---   case addWithCarry xs Nil c' of
---     Nil -> ()
---     (Cons h _) -> rank h `seq` ()
 
 -- Helper function to check if a heap contains only Zero bits
 {-@ reflect hasOnlyZeros @-}
