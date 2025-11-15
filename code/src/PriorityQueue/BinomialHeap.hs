@@ -123,6 +123,18 @@ bag (Bin a l r _) = B.put a (B.union (bag l) (bag r))
 pBag :: (Ord a) => Pennant a -> B.Bag a
 pBag (P a _ bt) = B.put a (bag bt)
 
+{-@reflect bbag @-}
+{-@ bbag :: BinomialBit a -> Bag a @-}
+bbag :: (Ord a) => BinomialBit a -> B.Bag a
+bbag (Zero _) = B.empty
+bbag (One _ p) = pBag p
+
+{-@reflect hbag @-}
+{-@ hbag :: BinomialHeap a -> Bag a @-}
+hbag :: (Ord a) => BinomialHeap a -> B.Bag a
+hbag Nil = B.empty
+hbag (Cons b h) = B.union (bbag b) (hbag h)
+
 {-@ predicate BagUnion H1 H2 H = (pBag H == B.union (pBag H1) (pBag H2)) @-}
 
 {-@reflect link @-}
@@ -257,7 +269,9 @@ bCarry (One _ p1) (Zero r2) = Zero (r2 + 1)
 bCarry (One r1 p1) (One _ p2) = One (r1 + 1) (link p1 p2)
 
 {-@ reflect bAdd @-}
-{-@ bAdd :: {h1: BinomialHeap a | bRank h1 == 0} -> {h2: BinomialHeap a | bRank h2 == 0} -> BinomialHeap a @-}
+{-@ bAdd :: h1: {h1: BinomialHeap a | bRank h1 == 0} 
+         -> h2: {h2: BinomialHeap a | bRank h2 == 0} 
+         -> BinomialHeap a @-}
 bAdd :: (Ord a) => BinomialHeap a -> BinomialHeap a -> BinomialHeap a
 bAdd xs ys = addWithCarry xs ys (Zero 0)
 
@@ -367,6 +381,12 @@ isRNil _ = False
 rbhead :: ReversedBinomialHeap a -> BinomialBit a
 rbhead (RCons a _) = a
 
+{-@reflect rhbag @-}
+{-@ rhbag :: ReversedBinomialHeap a -> Bag a @-}
+rhbag :: (Ord a) => ReversedBinomialHeap a -> B.Bag a
+rhbag RNil = B.empty
+rhbag (RCons b rh) = B.union (bbag b) (rhbag rh)
+
 {-@ measure rlast @-}
 {-@ rlast :: {rh: ReversedBinomialHeap a | not (isRNil rh)} -> BinomialBit a @-}
 rlast :: ReversedBinomialHeap a -> BinomialBit a
@@ -408,6 +428,11 @@ isEmptyView (Min _ _) = False
 getMinValue :: MinView q a -> a
 getMinValue (Min x _) = x
 
+{-@ reflect getRestHeap @-}
+{-@ getRestHeap :: m: { MinView q a| not isEmptyView m} -> q a @-}
+getRestHeap :: MinView q a -> q a
+getRestHeap (Min _ h) = h
+
 {-@ reverseToBinomialHeap :: rh: {rh: ReversedBinomialHeap a | (not (isRNil rh)) => rank (rlast rh) == 0} -> {h: BinomialHeap a | ((not (isRNil rh)) => (not (heapIsEmpty h) && rank (bhead h) == rank (rlast rh) && bRank h == 0))} / [rlen rh] @-}
 reverseToBinomialHeap :: ReversedBinomialHeap a -> BinomialHeap a
 reverseToBinomialHeap RNil = Nil
@@ -425,10 +450,9 @@ reverseToBinomialHeap rh@(RCons b bs) =
 
 {-@ predicate SplitOK H S = (heapIsEmpty H => isEmptyView S)
                             && (not (heapIsEmpty H) => not (isEmptyView S)
-                            && getMinValue S == minRootInHeap H
-                            && bag H == B.put (getMinValue S) (bag (getRestHeap S)))
+                            && getMinValue S == minRootInHeap H)
 @-}
-{-@ splitMin :: {h:BinomialHeap a | bRank h == 0} -> MinView BinomialHeap a @-}
+{-@ splitMin :: h:{h:BinomialHeap a | bRank h == 0} -> MinView BinomialHeap a @-}
 splitMin :: (Ord a) => BinomialHeap a -> MinView BinomialHeap a
 splitMin heap =
   if hasOnlyZeros heap
