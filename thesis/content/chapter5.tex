@@ -86,7 +86,7 @@ we present the refined type signatures and implementations of the key heap opera
 along with explanations of how they maintain the invariants of the leftist heap.
 \subsection{Heap isEmpty}
 This function checks if the heap is empty.
-There is no invariate to maintain here, but we define a measure to help with other proofs.
+There is no invariant to maintain here, but we define a measure to help with other proofs.
 \begin{code}
 {-@ measure heapIsEmpty @-}
 {-@ heapIsEmpty :: LeftistHeap a -> Bool @-}
@@ -98,7 +98,7 @@ heapIsEmpty _ = False
 To retrieve the minimum element from a non-empty heap, we define \texttt{heapFindMin}.
 We restrict its input to non-empty heaps and specify that the returned value is a lower bound for the heap.
 As per the heap property, the minimum element is always at the root of the heap.
-This can directly be extracted from the \texttt{HeapNode} and \texttt{LiquidHaskell} can verify that this value is indeed a lower bound for the entire heap.
+This can be directly extracted from the \texttt{HeapNode}, and \texttt{LiquidHaskell} can verify that this value is indeed a lower bound for the entire heap.
 \begin{code}
 {-@ heapFindMin :: h : {h : LeftistHeap a | not (heapIsEmpty h)} 
       -> {v : a | isLowerBound v h} @-}
@@ -222,7 +222,7 @@ lemma_heapMerge_case2 :: x2 : a
   / [size h2, size r1, 1]
 \end{code}
 The reason we cannot simply reuse \texttt{lemma\_merge\_case1} is that the order of the arguments to \texttt{heapMerge} is swapped in this case.
-And also the termination metric must reflect which arguments are reduced in the recursive call.
+Additionally, the termination metric must reflect which arguments are reduced in the recursive call.
 We discuss this in the next section.
 
 \subsubsection{Dealing with Termination and Recursion}
@@ -260,8 +260,8 @@ They form the core of the mechanized proof that merging two leftist heaps yields
 \subsection{Heap Insert}
 Heap insertion is implemented using heap merging.
 The refined type signature for \texttt{heapInsert} specifies that
-inserting an element into a non-empty heap produces a new heap where
-the inserted element is a lower bound for the resulting heap if it is smaller than the minimum of the original heap
+inserting an element into a heap produces a new heap where
+the inserted element is a lower bound for the resulting heap if it is smaller than the minimum of the original heap (when non-empty),
 and that the multiset of elements is updated accordingly.
 
 \begin{code}
@@ -272,8 +272,8 @@ heapInsert :: x : a
           => isLowerBound (min x (heapFindMin h1)) h
         && bag h = B.put x (bag h1) }
 \end{code}
-LiquidHaskell can automatically verify that the properties hold, given the correctness of \texttt{heapMerge}.
-So no additional lemmas are required here.
+\texttt{LiquidHaskell} can automatically verify that the properties hold, given the correctness of \texttt{heapMerge}.
+Therefore, no additional lemmas are required here.
 
 
 \subsection{Heap SplitMin}

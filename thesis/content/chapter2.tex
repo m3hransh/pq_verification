@@ -12,12 +12,12 @@ Functional data structures are \textbf{immutable}, meaning their state cannot be
 This immutability guarantees \textbf{referential transparency}: an expression can always be replaced by its value without altering program behavior.
 By contrast, in-place modifications, common in imperative data structures, introduce side effects that complicate reasoning, especially in concurrent environments \cite{okasaki}.
 
-To support updates without mutation, functional data structures rely on \textbf{persistence}: operations return a new version of the structure while preserving the original.
+To support updates without mutation, functional data structures rely on \textbf{persistence}: operations return a new version of the structure while preserving the old one.
 The seminal work in this area, Okasaki's \textit{Purely Functional Data Structures}, shows how persistence can be implemented efficiently through \textbf{structural sharing}.
 For example, when inserting into a tree, only the nodes along the update path are recreated, while the rest of the structure is reused.
 This design minimizes memory overhead while preserving previous versions.
 
-These properties, immutability, persistence, and structural sharing, not only improve modularity but also make functional data structures particularly well suited to formal verification.
+These properties—immutability, persistence, and structural sharing—not only improve modularity but also make functional data structures particularly well suited to formal verification.
 Invariants remain stable across all versions, allowing correctness properties to be reasoned about compositionally.
 This thesis builds on these principles, focusing on priority queues as a case study of verified functional data structures.
 

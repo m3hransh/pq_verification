@@ -88,7 +88,7 @@ heapMerge h1@(HeapNode x1 l1 r1 _) h2@(HeapNode x2 l2 r2 _)
 | x1 <= x2 = makeHeapNode x1 l1 (heapMerge r1 h2)
 | otherwise = makeHeapNode x2 l2 (heapMerge h1 r2)
 \end{code}
-Because the the right spine is kept short by the leftist property and at most is logarithmic, the merge operation runs in \(O(\log n)\) time.
+Because the right spine is kept short by the leftist property and is at most logarithmic, the merge operation runs in \(O(\log n)\) time.
 \begin{code}[caption={Leftist Heap helper functions}, label={lst:leftist-helpers}]
 makeHeapNode :: a -> LeftistHeap a -> LeftistHeap a -> LeftistHeap a
 makeHeapNode x h1 h2
@@ -117,7 +117,7 @@ heapSplit EmptyHeap = EmptyView
 heapSplit (HeapNode x l r _) = Min x (heapMerge l r)
 \end{code}
 
-In the chapter \ref{ch:verification}, we will verify that these implementations satisfy the priority queue interface and maintain the leftist heap invariants.
+In Chapter~\ref{ch:verification}, we will verify that these implementations satisfy the priority queue interface and maintain the leftist heap invariants.
 
 \section{Binomial Heap Implementation}
 \label{sec:binomial-impl}
@@ -155,7 +155,7 @@ There are three invariants that pennants must satisfy:
 
 \input{figures/binomial.tex}
 The primary operation on pennants is \texttt{link}, which combines two pennants of equal height~$h$ into a single pennant of height~$h+1$.
-The root of the resulting pennant is less than or equal to the roots of the two original pennants.
+The root of the resulting pennant is the minimum of the roots of the two original pennants.
 
 \begin{code}[caption={Linking two Pennants}, label={lst:pennant-link}]
 link :: (Ord a) => Pennant a -> Pennant a -> Pennant a
@@ -179,7 +179,7 @@ Merging two binomial heaps is analogous to adding two binary numbers.
 The addition is performed by a ripple-carry adder that processes the lists of bits.
 For instance, adding two \texttt{One} bits of the same rank involves linking their pennants to form a carry bit of the next higher rank.
 
-Following the ripple-carry adder approach, we define a \texttt{halfAdder} function that takes two bits and produces a sum bit and a carry bit.
+Following the ripple-carry adder approach, we define a \texttt{bHalfAdder} function that takes two bits and produces a sum bit and a carry bit.
 
 \begin{code}[caption={Half Adder for Binomial Bits}, label={lst:bit-half-adder}]
 bHalfAdder :: (Ord a) => BinomialBit a
@@ -188,7 +188,7 @@ bHalfAdder :: (Ord a) => BinomialBit a
 bHalfAdder b1 b2 = (bSum b1 b2, bCarry b1 b2)
 \end{code}
 
-Additionally, we define a \texttt{fullAdder} function that takes two bits and an incoming carry bit, producing a sum bit and an outgoing carry bit.
+Additionally, we define a \texttt{bFullAdder} function that takes two bits and an incoming carry bit, producing a sum bit and an outgoing carry bit.
 \begin{code}[caption={Full Adder for Binomial Bits}, label={lst:bit-adder}]
 bFullAdder :: (Ord a) => BinomialBit a
                       -> BinomialBit a
@@ -196,11 +196,11 @@ bFullAdder :: (Ord a) => BinomialBit a
                       -> (BinomialBit a, BinomialBit a)
 bFullAdder b1 b2 cin = 
   let (s, c1) = bHalfAdder b1 b2
-      (s', c2) = bHalfAdder s c
+      (s', c2) = bHalfAdder s cin
    in (s', bSum c1 c2)
 \end{code}
 
-The bSum and bCarry functions handle the logic for combining bits of the same rank according to the rules of binary addition.
+The \texttt{bSum} and \texttt{bCarry} functions handle the logic for combining bits of the same rank according to the rules of binary addition.
 \begin{code}[caption={bSum and bCarry Functions}, label={lst:bit-sum-carry}]
 bSum :: (Ord a) => BinomialBit a
                 -> BinomialBit a
@@ -219,7 +219,7 @@ bCarry (One r1 p1) (One _ p2) = One (r1 + 1) (link p1 p2)
 
 \end{code}
 
-Finally, we can implement adding of two binomial heaps using the full adder logic.
+Finally, we can implement the addition of two binomial heaps using the full adder logic.
 \begin{code}[caption={Merging Two Binomial Heaps}, label={lst:heap-merge}]
 add :: (Ord a) => BinomialHeap a
                -> BinomialHeap a
@@ -340,6 +340,6 @@ dismantle (Bin m l r h) = case r of
 The reversed heap is then converted back to a standard binomial heap using \texttt{reverseToBinomialHeap}, which reverses the list so that ranks increase from left to right. This conversion is necessary because the standard heap operations expect pennants ordered by increasing rank.
 \end{itemize}
 
-This representation of binomial heaps is both elegant and well-suited for formal verification, as we will discuss in Chapter \ref{ch:verification}.
-Rather than verifying every operation, we concentrate on the main operations, which serves as the fundamental building block from which other operations can be derived.
+This representation of binomial heaps is both elegant and well-suited for formal verification, as we will discuss in Chapter~\ref{ch:verification}.
+Rather than verifying every operation, we concentrate on the main operations, which serve as the fundamental building blocks from which other operations can be derived.
 

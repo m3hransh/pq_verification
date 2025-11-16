@@ -42,14 +42,14 @@ lookup 0 (x : _) = x
 lookup x (_ : xs) = lookup (x - 1) (xs)
 \end{code}
 
-The Haskell type system ensures that \texttt{lookup} takes an integers, a list of intergers and
+The Haskell type system ensures that \texttt{lookup} takes an integer, a list of integers, and
 returns an integer. For example, an application \texttt{lookup True [3]} is rejected
 because the first argument has type \texttt{Bool}. However, the standard type
 system does not rule out the erroneous call \texttt{lookup -1 [3]}.
 
 Of course, we could use Haskell's \texttt{Maybe} type to indicate that the function
 returns \texttt{Nothing} for out-of-bounds indices. However, this merely shifts the
-handling of invalid inputs to the caller, who must remember to check for the \texttt{Nothing}.
+handling of invalid inputs to the caller, who must remember to check for \texttt{Nothing}.
 
 
 With refinement types, we can express stronger specifications. In
@@ -78,8 +78,8 @@ For brevity, one can use type aliases or predicates to define commonly used refi
 predicate Btwn Lo N Hi = Lo <= N && N < Hi
 type Nat =  {v : Int | v >= 0}
 \end{code}
-Additionally, Holes can be used for Haskell types, as those types can be infereded from the
-regualar Haskell type signature or via GHC's type inference \cite{vazou_liquidhaskell_2014}.
+Additionally, holes can be used for Haskell types, as those types can be inferred from the
+regular Haskell type signature or via GHC's type inference \cite{vazou_liquidhaskell_2014}.
 
 In \texttt{LiquidHaskell}, Constants such as integers and booleans are given
 singleton types, i.e., types that describe precisely one value
@@ -119,12 +119,12 @@ checker must show:
 	\emptyset \;\vdash\; \{ v:\mathrm{Int} \mid v = -1 \} \;\preceq\;
 	\{ v:\mathrm{Int} \mid v \geq 0 \}.
 \]
-This so called \emph{subtyping query} is then translated into a logical implication, known
+This so-called \emph{subtyping query} is then translated into a logical implication, known
 as a \emph{verification condition (VC)}:
 \[
 	(v = -1) \;\Rightarrow\; (v \geq 0).
 \]
-These logical formula then passed to an SMT solver for validation.
+These logical formulas are then passed to an SMT solver for validation.
 Since the formula is unsatisfiable, the assignment is rejected.
 
 Figure~\ref{fig:notation} summarizes the notation used to translate subtyping
@@ -151,13 +151,13 @@ less than the length of the list:
 lookup :: i : Nat -> xs : {[a] | i < len xs} -> a
 \end{code}
 
-The type of second argument states that the list \texttt{xs} must have length greater than \texttt{i}.
+The type of the second argument states that the list \texttt{xs} must have length greater than \texttt{i}.
 \texttt{len} is a function defined by \texttt{LiquidHaskell} in the refinement logic that returns the length of the list.
 In \S\ref{sec:reflection}, we will show how to define and use user-defined functions in the refinement logic.
 
 \section{Refined Data Types}
 \label{sec:lh-refined-datatypes}
-In the previous examples, we saw how refinements of input and output of function allow us to have stronger arguments about our program.
+In the previous examples, we saw how refinements of the input and output of functions allow us to make stronger arguments about our programs.
 We can take this further by refining the data types.
 We use the following example as an illustration, following~\cite{jhala2020}:
 \begin{code}
@@ -167,11 +167,10 @@ data Slist a = Slist {
 }
 \end{code}
 
-This refined \textit{Slist} data type ensures the stored `size` always matches the length of the `elems` list,
+This refined \textit{Slist} data type ensures the stored \texttt{size} always matches the length of the \texttt{elems} list,
 as formalized in the refinement annotation.
-This ensures that the size of the list is always correct.
 
-In the following section, we show how can we use reflection or measure directives to reason about user-defined Haskell function in the refinement logic.
+In the following section, we show how we can use reflection or measure directives to reason about user-defined Haskell functions in the refinement logic.
 
 \section{Lifting Functions to the Refinement Logic}
 \label{sec:reflection}
@@ -181,7 +180,7 @@ reflecting the code implementing a Haskell function into the function’s output
 That means we are able to reason about the function's behavior directly in the refinement logic.
 There are two ways to do this: \texttt{reflection} and \texttt{measure}.
 
-\texttt{Measure} can be used on a function with one argument which is a Algebraic Data Type (ADT), like a list \cite{niki_lecture_2024}.
+\texttt{Measure} can be used on a function with one argument which is an Algebraic Data Type (ADT), such as a list \cite{niki_lecture_2024}.
 Consider the data type of a bag (multiset) defined as a map from elements to their multiplicities:
 \begin{code}
 data Bag a = Bag { toMap :: M.Map a Int } deriving Eq
@@ -215,15 +214,15 @@ invariants of the \texttt{List} data type. For instance, in the following exampl
 >>      VV : {VV##2465 : () | bag (Cons 1 (Cons 3 Nil)) == bag (Cons 2 Nil)}
 \end{code}
 
-The \texttt{\{x = y\}} is shorthand for \texttt{\{v :() | x = y\}}, where $x$ and $y$ are expressions.
+The \texttt{\{x = y\}} is shorthand for \texttt{\{v : () | x = y\}}, where $x$ and $y$ are expressions.
 This formulation is motivated by the fact that the equality predicate $x = y$ is a condition that does not depend on any particular value.
 Note that equality for bags is defined as the equality of the underlying maps that already have a built-in equality function.
 
 
 Reflection is another useful feature that allows the user to define a function in the refinement logic, providing
 the SMT solver with the function's behavior \cite{vazou2018}.
-This has the advantage of allowing the user to lift in the logic functions with more than one argument, but the verification
-is no more automated \cite{niki_lecture_2024}.
+This has the advantage of allowing the user to lift into the logic functions with more than one argument, but the verification
+is no longer automated \cite{niki_lecture_2024}.
 Additionally, with the use of a library of combinators provided by \texttt{LiquidHaskell}, we can leverage
 the existing programming constructs (e.g. pattern-matching and recursion) to prove the correctness of the
 program and use the principle of programs-as-proofs.
@@ -241,8 +240,8 @@ To illustrate the use of reflection, we define the \texttt{(++)} function in the
 [] ++ ys = ys
 (x : xs) ++ ys = x : (xs ++ ys)
 \end{code}
-The \texttt{\{-@ LIQUID "--reflection" @-\}} annotation used to activate the reflection feature in \texttt{LiquidHaskell}.
-The \texttt{reflect} annotation, lift the \texttt{(++)} into the logic in three steps \cite{vazou2018}:
+The \texttt{\{-@ LIQUID "--reflection" @-\}} annotation is used to activate the reflection feature in \texttt{LiquidHaskell}.
+The \texttt{reflect} annotation lifts the \texttt{(++)} into the logic in three steps \cite{vazou2018}:
 \begin{enumerate}
 	\item \textbf{Definition}: The annotation creates an \textit{uninterpreted function} \texttt{
 	      (++) :: [a] -> [a] -> [a]} in the refinement logic. By uninterpreted, we mean that the logical \texttt{(++)} is
@@ -267,9 +266,9 @@ else cons (head xs) (ppProp (tail xs) ys)
 
 	\item \textbf{Application}: With the reflected refinement type, each application of \texttt{(++)}
 	      in the code automatically unfolds the definition of \texttt{(++)} only \textit{once} in the logic. In the
-	      next section, we will look into \texttt{PLE} that allows to unfold the definition of the function multiple times.
+	      next section, we will look into \texttt{PLE} that allows unfolding the definition of the function multiple times.
 \end{enumerate}
-we can now reason about properties of \texttt{(++)} in the refinement logic that requires unfolding its definition,
+We can now reason about properties of \texttt{(++)} in the refinement logic that require unfolding its definition,
 as opposed to treating it only as an uninterpreted function.
 In the following subsection,
 we will show how to use \texttt{LiquidHaskell} to verify that the \texttt{(++)} function is associative.
@@ -285,7 +284,7 @@ data PList a <p :: a -> a -> Bool>
 	| Cons { phd :: a, ptl :: PList <p> a <p phd> }
 \end{code}
 
-Here, the type \texttt{a<p>} is a refinement type, equivalent to \texttt{\{v:a | p\ v\}} .
+Here, the type \texttt{a<p>} is a refinement type, equivalent to \texttt{\{v:a | p v\}}.
 The abstraction \texttt{<p :: a -> a -> Bool>} allows us to parameterize the list by a binary predicate \texttt{p}.
 
 We can now use this abstraction to define a list of integers where each element is less than or equal to the next:
@@ -294,7 +293,7 @@ We can now use this abstraction to define a list of integers where each element 
 type SortedList = PList <{\x y -> x <= y}> Int
 \end{code}
 
-LiquidHaskell can verify that the following list is sorted:
+\texttt{LiquidHaskell} can verify that the following list is sorted:
 
 \begin{code}
 {-@ ok :: SortedList @-}
@@ -371,7 +370,7 @@ assoc (x : xs) ys zs = ((x : xs) ++ ys) ++ zs
 \end{code}
 \vspace{1em}
 
-As you can see, we use proof by induction and in the induction step we use recursive call in the last step.
+As can be seen, we use proof by induction, and in the induction step we use the recursive call in the last step.
 
 \section{Totality}
 Ensuring \emph{total} functions—functions defined for all possible inputs—is essential in program verification.
@@ -518,11 +517,11 @@ For such functions, termination checking can be disabled locally with the \textt
 
 \section{Proof by Logical Evaluation}
 \label{sec:lh-ple}
-In our proof in code \ref{lst:associative}, we primarily relied on straightforward unfoldings of the \texttt{(++)} function definition.
+In our proof in Code~\ref{lst:associative}, we primarily relied on straightforward unfoldings of the \texttt{(++)} function definition.
 However, \texttt{LiquidHaskell} provides a directive known as \texttt{Proof by Logical Evaluation} (PLE), which offers two significant advantages \cite{vazou2018}.
 First, PLE is guaranteed to construct an equational proof whenever one can be derived solely from unfoldings of function definitions, provided the user supplies necessary lemmas and induction hypotheses \cite{vazou2018}.
 Second, under practical conditions that are commonly satisfied, PLE is guaranteed to terminate \cite{vazou2018}.
-We can activate PLE by adding \texttt{\{-@ LIQUID "---ple" @-\}} annotation to automate the most parts of the proof for associativity of \texttt{(++)}:
+We can activate PLE by adding the \texttt{\{-@ LIQUID "--ple" @-\}} annotation to automate most parts of the proof for associativity of \texttt{(++)}:
 
 \begin{code}
 {-@ LIQUID "--ple" @-}
