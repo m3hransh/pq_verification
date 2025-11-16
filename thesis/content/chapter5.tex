@@ -337,22 +337,34 @@ The correctness of this implementation relies on two key facts:
 
 Thus, the \texttt{heapSplit} function correctly decomposes any leftist heap into its minimal element and the remainder,
 while preserving both structural and content invariants as captured by \texttt{SplitOK}.
-\section{Verification of Binomial Heaps (Selected Parts)}
+\section{Verification of Binomial Heaps}
 \label{sec:verify-binomial}
-This section connects to the implementation in Chapter~\ref{ch:impl},
-(\S\ref{sec:binomial-impl}) and presents proofs for the parts currently
-mechanized in code: (i) the \emph{pennant} and its internal tree invariants,
-(ii) the \emph{link}/\texttt{merge} of two pennants, (iii) rank-correctness of
+Building upon the verification techniques established for leftist heaps (\S\ref{sec:verify-leftist}),
+this section presents the verification of binomial heaps.
+The binomial heap structure, described in Chapter~\ref{ch:impl} (\S\ref{sec:binomial-impl}),
+is more intricate than leftist heaps, requiring a compositional approach across three data structure layers.
+We verify: (i) the \emph{pennant} and its internal tree invariants,
+(ii) the \emph{link} operation for merging two pennants, (iii) rank-correctness of
 bit-level addition (\texttt{bSum}, \texttt{bCarry}, \texttt{bHalfAdder}, \texttt{bFullAdder}),
 and (iv) the termination and rank consistency of \texttt{addWithCarry}.
-We deliberately \emph{omit} proofs for \texttt{findMin} and \texttt{splitMin} at this stage.
+As with leftist heaps, we leverage the shared logical infrastructure (\S\ref{sec:shared-infra}),
+particularly the \texttt{isLowerBound} predicate for expressing heap properties.
 
-\subsection{Pennants and Internal Tree Invariants}
+\subsection{Refined Data Structures}
 \label{sec:binomial-pennant}
 
-We model the pennant as a root key with an internal perfect tree (the ``bin'')
-that holds the remaining elements following Listing \ref{lst:pennant-type}. We expose its height to the logic and
-assert the lower-bound property at every node. In LiquidHaskell notation:
+Following the pattern established for leftist heaps (\S\ref{sec:verify-leftist}), we encode
+the binomial heap's structural invariants directly into refined data types.
+The binomial heap implementation (Chapter~\ref{ch:impl}, \S\ref{sec:binomial-impl}) 
+is built from three nested structures: binary trees, pennants, and bit-level heaps.
+Each layer is verified through appropriate refinements.
+
+\subsubsection{Binary Trees with Left-Ordering}
+
+The foundation is a perfect binary tree with a left-ordering property rather than a full heap property.
+We reuse the \texttt{isLowerBound} predicate from the shared infrastructure (\S\ref{sec:shared-infra}),
+but apply it only to the left child. The refined \texttt{BinTree} type ensures both left-ordering
+and perfect balance:
 \begin{code}
 type BinTreeBound a X = {b : BinTree a | isLowerBound X b}
 data BinTree a = Empty
@@ -372,8 +384,11 @@ bheight Empty = -1
 bheight (Bin _ _ _ h) = h
 \end{code}
 
-The refined \texttt{Pennant} type asserts that the internal tree is a lower-bounded
-perfect tree of the advertised height:
+\subsubsection{Pennants}
+
+A pennant wraps a binary tree with its root element. The refined \texttt{Pennant} type
+enforces the \textbf{Minimum Property} from Chapter~\ref{ch:impl}---the root is less than
+or equal to all elements in the internal tree:
 \begin{code}
 data Pennant a 
   = P 
@@ -382,18 +397,30 @@ data Pennant a
   , bin     :: {b : BinTreeBound a root | bheight b + 1 = pheight}
   }
 \end{code}
-These refined data types directly encode the invariants for pennants described in Chapter~\ref{ch:impl}:
-\begin{itemize}
-    \item {\textbf{Minimum Property}:} The refinement on the \texttt{bin} field, \texttt{\{b:BinTreeBound a root | ...\}}, ensures that the pennant's \texttt{root} is a lower bound for all elements in its internal tree \texttt{bin}. This is because \texttt{BinTreeBound a root} is an alias for \texttt{\{h : BinTree a | isLowerBound root h\}}.
 
-    \item {\textbf{Perfect Binary Property}: 
-            The structure of \texttt{BinTree} guarantees that it is a perfect binary tree.
-            The refinement \texttt{right :: BinTreeHeight a (bheight left)} enforces that the left and right children of any node have the same height (\texttt{bheight left == bheight right}).
-            The height of a node is then one greater than its children's height, which is the definition of a perfect binary tree.
-            The \texttt{bheight b + 1 = pheight} check in the \texttt{Pennant} type connects the pennant's height to the height of its internal tree.}
+The refinement \texttt{bin :: \{b : BinTreeBound a root | ...\}} ensures \\ \texttt{isLowerBound root bin},
+capturing the \textbf{Minimum Property}. The height constraint \texttt{bheight b + 1 = pheight}
+connects the pennant's advertised height to its internal tree structure.
 
-    \item {\textbf{Internal Heap Property}:} Chapter~\ref{ch:impl} describes a \emph{Left-ordering Property}. Our verified implementation uses a standard heap property within the internal \texttt{BinTree} instead. The refinement \texttt{left :: BinTreeBound a value} on the \texttt{Bin} constructor requires that a node's \texttt{value} is a lower bound for its own \texttt{left} subtree. This is a sufficient condition for the correctness of the \texttt{merge} operation on pennants.
-\end{itemize}
+Together with the \texttt{BinTree} definition, the three invariants from Chapter~\ref{ch:impl} are enforced:
+\begin{enumerate}
+    \item \textbf{Minimum Property:} The \texttt{Pennant} refinement \texttt{bin :: BinTreeBound a root}
+    ensures that the pennant's root is a lower bound for all elements in its internal tree
+    (\texttt{isLowerBound root bin}).
+
+    \item \textbf{Left-ordering Property:} Within the internal \texttt{BinTree}, the refinement
+    \texttt{left :: BinTreeBound a value} ensures that each node's value is a lower bound for its
+    left subtree (\texttt{isLowerBound value left}). This means for every node, the left child's
+    value is less than or equal to the right child's value. Note that this is \emph{weaker} than
+    the full heap property used in leftist heaps (\S\ref{sec:verify-leftist})---we only enforce
+    ordering between the parent and left child, not both children.
+
+    \item \textbf{Perfect Binary Tree Property:} The \texttt{BinTree} refinement
+    \texttt{right :: BinTreeHeight a (bheight left)} enforces that both subtrees have identical height.
+    Combined with the height correctness constraint \texttt{height :: \{h:Nat | h == 1 + bheight right\}},
+    this ensures the tree is perfectly balanced: all internal nodes have two subtrees of equal height,
+    and all leaves are at the same level.
+\end{enumerate}
 
 \subsection{Pennant Operations}
 
@@ -433,10 +460,17 @@ Verification of this function hinges on proving that the new pennant satisfies t
 \end{enumerate}
 This final step is not obvious to the SMT solver, so we provide an explicit proof using the \texttt{lemma\_isLowerBound\_transitive}, which is identical in function to the one used for Leftist Heaps (\S\ref{sec:verify-leftist}). This lemma proves that if \texttt{x <= y} and \texttt{y} is a lower bound for a tree, then \texttt{x} is also a lower bound.
 
-\subsection{Bit-level Addition and Rank Correctness}
-The merge operation for binomial heaps is analogous to binary addition. The heap is a list of bits (\texttt{Zero} or \texttt{One}), and merging is a ripple-carry add. LiquidHaskell is used to prove that the ranks of these bits are handled correctly throughout the addition logic.
+\subsection{Binomial Heap Representation and Bit-level Operations}
+\label{sec:binomial-bits}
 
-Each bit is tagged with its rank (or order).
+Following Chapter~\ref{ch:impl}, a binomial heap is represented as a list of bits, where each bit
+at position $i$ either contains \texttt{Zero} or \texttt{One} pennant of height $i$. This representation
+is analogous to the binary representation of a number, enabling efficient merge operations through
+bit-level addition.
+
+\subsubsection{Refined Bit Structure}
+
+Each bit is tagged with its rank (order) and refined to ensure rank-height consistency:
 \begin{code}
 data BinomialBit a 
   = Zero { zorder :: Nat }
@@ -444,57 +478,434 @@ data BinomialBit a
          , pennant :: {p : Pennant a | pheight p == oorder}
          }
 \end{code}
-A \texttt{BinomialHeap} is a list of these bits, with ranks strictly increasing by one at each step. This is enforced by a refined \texttt{PList} type from LiquidHaskell's prelude.
+The refinement \texttt{pennant :: \{p : Pennant a | pheight p == oorder\}} ensures that a
+\texttt{One} bit at rank $i$ contains a pennant of height $i$.
+
+A \texttt{BinomialHeap} is a list of these bits with ranks strictly increasing by one at each step.
+Rather than using LiquidHaskell's parameterized \texttt{PList} type, we define a custom refined
+data type that directly encodes the rank-incrementing invariant:
+
 \begin{code}
-type BinomialHeap a 
-  = PList <{\hd v -> rank hd == rank v - 1}> (BinomialBit a)
+{-@ data BinomialHeap [len] a =
+        Nil
+      | Cons { hd :: BinomialBit a
+             , tl :: {bs : BinomialHeap a |
+                      not (heapIsEmpty bs) =>
+                        rank (bhead bs) = rank hd + 1}
+             }
+@-}
+data BinomialHeap a
+  = Nil
+  | Cons { hd :: BinomialBit a, tl :: BinomialHeap a }
 \end{code}
 
-The adder logic is built from \texttt{bSum} and \texttt{bCarry} functions, which are combined into half-adders and full-adders. Their refined types guarantee rank-correctness.
-\begin{code}
-bSum :: b1 : BinomialBit a -> b2 : {BinomialBit a | rank b2 == rank b1}
-         -> {b : BinomialBit a | rank b == rank b1}
+This refinement maintains the binomial heap's structural invariant: if the tail is non-empty, its
+first bit's rank must be exactly one more than the current bit's rank. The measure \texttt{len}
+provides a termination metric for recursive functions over heaps. We define \texttt{heapIsEmpty}
+and \texttt{bhead} as measures to check emptiness and access the first bit:
 
-bCarry :: b1 : {BinomialBit a | rank b1 >= 0}
-          -> b2 : {BinomialBit a | rank b2 == rank b1}
-          -> {b : BinomialBit a | rank b == rank b1 + 1}
-\end{code}
-\texttt{bSum} produces a bit of the same rank, while \texttt{bCarry} produces a carry bit of the next higher rank. These are composed into a full-adder, which also guarantees correct output ranks for its sum and carry bits.
 \begin{code}
-bFullAdder :: b1:BinomialBit a
-    -> b2 : {BinomialBit a | rank b2 == rank b1}
-    -> c: {BinomialBit a | rank c == rank b1}
-    -> (BinomialBit a, BinomialBit a)
-        <{\s co -> rank s == rank b1 && rank co == rank b1 + 1}> 
+{-@ measure heapIsEmpty @-}
+heapIsEmpty :: BinomialHeap a -> Bool
+heapIsEmpty Nil = True
+heapIsEmpty _ = False
+
+{-@ measure bhead @-}
+{-@ bhead :: {b:BinomialHeap a | not (heapIsEmpty b)} -> BinomialBit a @-}
+bhead :: BinomialHeap a -> BinomialBit a
+bhead (Cons a _) = a
 \end{code}
-These rank-preserving properties are essential for the main merge algorithm, \texttt{addWithCarry}, to produce a valid \texttt{BinomialHeap}.
+
+Additionally, the measure \texttt{bRank} extracts the rank of a heap's first bit (or 0 for empty heaps),
+which is crucial for specifying preconditions on operations like \texttt{bAdd} that require heaps
+starting at rank 0:
+
+\begin{code}
+{-@ measure bRank @-}
+{-@ bRank :: BinomialHeap a -> Nat @-}
+bRank :: BinomialHeap a -> Int
+bRank Nil = 0
+bRank (Cons b bs) = rank b
+\end{code}
+
+\subsubsection{Bit Arithmetic Operations}
+
+Following the ripple-carry adder approach from Chapter~\ref{ch:impl}, the merge operation is
+implemented through bit-level addition. The \texttt{bSum} and \texttt{bCarry} functions form the
+basis of this arithmetic, with refined types guaranteeing rank-correctness:
+
+\begin{code}
+bSum :: b1:BinomialBit a -> 
+            b2:{BinomialBit a | rank b2 == rank b1} -> 
+            {b:BinomialBit a | rank b == rank b1}
+
+bCarry :: Ord a => 
+              b1:{BinomialBit a | rank b1 >= 0} -> 
+              b2:{BinomialBit a | rank b2 == rank b1} -> 
+              {b:BinomialBit a | rank b == rank b1 + 1}
+\end{code}
+
+The \texttt{bSum} function produces a bit of the same rank as its inputs, while \texttt{bCarry}
+produces a carry bit of the next higher rank. Both functions are reflected into the refinement
+logic, enabling LiquidHaskell to reason about their behavior during verification.
+
+These primitives are composed into half-adders and full-adders:
+
+\begin{code}
+bHalfAdder :: b1:BinomialBit a ->
+                  b2:{BinomialBit a | rank b2 == rank b1} ->
+                  ({s:BinomialBit a | rank s == rank b1}, 
+                   {c:BinomialBit a | rank c == rank b1 + 1})
+
+bFullAdder :: b1:BinomialBit a ->
+                  b2:{BinomialBit a | rank b2 == rank b1} ->
+                  c:{BinomialBit a | rank c == rank b1} ->
+                  ({s:BinomialBit a | rank s == rank b1}, 
+                   {co:BinomialBit a | rank co == rank b1 + 1})
+\end{code}
+
+The half-adder takes two bits at rank $r$ and produces a sum at rank $r$ and a carry at rank $r+1$.
+The full-adder additionally accepts a carry-in bit at rank $r$, producing the same outputs.
+These rank-preserving refinement types ensure that the composed operations maintain heap rank
+consistency without requiring explicit rank-preservation lemmas---LiquidHaskell's PLE
+(\S\ref{sec:lh-ple}) automatically unfolds the reflected definitions to verify correctness.
 
 \subsection{Heap Merging with \texttt{addWithCarry}}
-The function \texttt{addWithCarry} implements the ripple-carry addition recursively over the lists of bits. Its refined type is complex, mainly to ensure that the carry bit passed between recursive calls has the expected rank.
+
+The function \texttt{addWithCarry} implements the ripple-carry addition recursively over the lists
+of bits. Its refined type ensures that the carry bit passed between recursive calls has the expected
+rank, and that the output maintains heap rank consistency.
+
+The top-level \texttt{bAdd} function initiates the merge by calling \texttt{addWithCarry} with an
+initial carry of \texttt{Zero 0}:
 
 \begin{code}
-addWithCarry :: h1 : BinomialHeap a
-  -> h2 : {BinomialHeap a | 
-            ( bRank h2 == bRank h1 || isNil h1) 
-            || isNil h2
-          }
-  -> carry : {BinomialBit a | ((not isNil h1) => rank carry == bRank h1)
-                            && ((not isNil h2) => rank carry == bRank h2)}
-  -> {b : BinomialHeap a | ...} 
-  / [len h1, len h2, 0]
+bAdd :: h1:{BinomialHeap a | bRank h1 == 0} ->
+            h2:{BinomialHeap a | bRank h2 == 0} ->
+            BinomialHeap a 
+bAdd :: (Ord a) => BinomialHeap a -> BinomialHeap a -> BinomialHeap a
+bAdd xs ys = addWithCarry xs ys (Zero 0)
+\end{code}
+
+The precondition requires both input heaps to start at rank 0, which is maintained by all
+priority queue operations through the \texttt{padWithZeros} helper.
+
+The \texttt{addWithCarry} function has a more complex refinement type:
+
+\begin{code}
+addWithCarry :: 
+      h1:BinomialHeap a ->
+      h2:{BinomialHeap a | 
+          (bRank h2 == bRank h1 || heapIsEmpty h1) 
+          || heapIsEmpty h2} ->
+      carry:{BinomialBit a | 
+             ((not (heapIsEmpty h1)) => rank carry == bRank h1)
+             && ((not (heapIsEmpty h2)) => rank carry == bRank h2)} ->
+      {b:BinomialHeap a | 
+       (not (heapIsEmpty b)) => rank (bhead b) == rank carry}
+      / [len h1, len h2]
 \end{code}
 
 The key properties verified by LiquidHaskell are:
+
 \begin{itemize}
-    \item \textbf{Termination:} The function terminates, which is guaranteed by the lexicographic metric \texttt{/ [len h1, len h2, 0]}, as each recursive call consumes at least one of the input lists.
-    \item \textbf{Rank Propagation:} The precondition on \texttt{carry} ensures that its rank matches the rank of the bits being processed. For a recursive call, the new carry \texttt{c'} is generated by \texttt{bFullAdder}. We must prove that \texttt{rank c'} matches the rank of the next bits in the lists. The \texttt{PList} invariant that ranks increase by 1 at each step is crucial here. For example, if we process bit \texttt{x} and recurse on \texttt{xs}, the new carry \texttt{c'} will have rank \texttt{rank x + 1}. The \texttt{PList} invariant ensures that the head of \texttt{xs} also has rank \texttt{rank x + 1}, so the precondition for the recursive call holds.
+    \item \textbf{Rank Alignment:} The precondition ensures that when both heaps are non-empty,
+    they have the same starting rank. Additionally, the carry bit's rank must match the starting
+    rank of any non-empty input heap.
+
+    \item \textbf{Output Rank:} The postcondition guarantees that if the result is non-empty, its
+    first bit has the same rank as the input carry. This ensures that the output heap's structure
+    is consistent with the input.
+
+    \item \textbf{Termination:} The lexicographic metric \texttt{/ [len h1, len h2]} proves
+    termination, as each recursive call consumes at least one bit from one of the input heaps.
 \end{itemize}
-Lemmas like \texttt{lemma\_rank\_preservation} are used to explicitly prove to the solver that the sum bit produced by the full adder has the correct rank to be prepended to the result of the recursive call, thus maintaining the \texttt{BinomialHeap} invariant.
 
-\paragraph{Out-of-scope (not verified here).}
-We do \emph{not} include proofs for \texttt{findMin} and \texttt{splitMin}; these would
-require additional invariants over the list-of-bits representation (argmin over
-roots and dismantling the perfect tree), which we leave as future work.
+The verification relies on the refined types of \texttt{bFullAdder}, which guarantee that the new
+sum bit has the correct rank for prepending to the recursive result, and that the new carry bit
+has rank $r+1$ for matching the next bits in the lists. The \texttt{BinomialHeap} data type
+refinement ensures that consecutive bits differ by exactly one in rank, so when processing bit at
+rank $r$, the tail's first bit (if it exists) has rank $r+1$, matching the new carry's rank.
 
+LiquidHaskell's PLE automatically unfolds the reflected definitions of \texttt{bSum}, \texttt{bCarry},
+and \texttt{bFullAdder} to verify these rank invariants hold throughout the recursion, eliminating
+the need for explicit rank-preservation lemmas.
+
+\subsection{Finding and Extracting Minimum Elements}
+\label{sec:binomial-findmin}
+
+The binomial heap's list-of-bits representation requires searching across multiple pennants to find
+the global minimum. Unlike leftist heaps where the minimum is always at the root, binomial heaps
+must examine the root of each non-empty pennant (each \texttt{One} bit) in the heap.
+
+\subsubsection{Checking for Empty Heaps}
+
+A binomial heap is effectively empty when it contains only \texttt{Zero} bits. The \texttt{hasOnlyZeros}
+predicate captures this property:
+
+\begin{code}
+{-@ reflect hasOnlyZeros @-}
+{-@ hasOnlyZeros :: BinomialHeap a -> Bool @-}
+hasOnlyZeros :: BinomialHeap a -> Bool
+hasOnlyZeros Nil = True
+hasOnlyZeros (Cons (Zero _) bs) = hasOnlyZeros bs
+hasOnlyZeros (Cons (One _ _) _) = False
+\end{code}
+
+This predicate is reflected into the logic and used as a precondition for operations that require
+a non-empty heap.
+
+\subsubsection{Finding the Minimum Root}
+
+The \texttt{minRootInHeap} function searches through the list of bits to find the minimum among
+all pennant roots. Its refined type ensures it is only called on heaps containing at least one
+\texttt{One} bit:
+
+\begin{code}
+{-@ reflect minRootInHeap @-}
+{-@ minRootInHeap :: Ord a =>
+      h:{BinomialHeap a | not (hasOnlyZeros h)} -> a @-}
+minRootInHeap :: (Ord a) => BinomialHeap a -> a
+minRootInHeap (Cons (Zero _) bs) = minRootInHeap bs
+minRootInHeap (Cons (One _ (P r _ _)) Nil) = r
+minRootInHeap (Cons (One _ (P r _ _)) bs@(Cons _ _)) =
+  if hasOnlyZeros bs
+    then r
+    else min r (minRootInHeap bs)
+\end{code}
+
+The function recursively skips \texttt{Zero} bits and compares roots of \texttt{One} bits using the
+\texttt{min} function (see \S\ref{sec:shared-infra}). The precondition \texttt{not (hasOnlyZeros h)}
+ensures the recursion encounters at least one \texttt{One} bit before reaching \texttt{Nil}.
+
+\subsubsection{Extracting the Minimum Pennant}
+
+The \texttt{extractMin} function locates and removes the pennant with the minimum root value,
+returning both the pennant and the remaining heap. Its refined type guarantees that the extracted
+pennant's root is indeed the minimum:
+
+\begin{code}
+{-@ extractMin :: (Ord a) =>
+      {h:BinomialHeap a | not (hasOnlyZeros h)} ->
+      ({p:Pennant a | minRootInHeap h == root p},
+       {h':BinomialHeap a |
+         (not (heapIsEmpty h') => rank (bhead h') == rank (bhead h))
+         && (bRank h == 0 => (heapIsEmpty h' || bRank h' == 0))}) @-}
+\end{code}
+
+The implementation traverses the bit list, comparing roots and recursively extracting from the
+tail when necessary. The refinement ensures:
+\begin{itemize}
+    \item The extracted pennant's root equals \texttt{minRootInHeap h}.
+    \item The remaining heap maintains rank consistency (if non-empty, its first bit has the same rank).
+    \item If the input heap starts at rank 0, the output heap is either empty or also starts at rank 0.
+\end{itemize}
+
+The verification relies on comparing roots using the \texttt{min} function and the transitivity
+of the $\leq$ relation, which PLE can establish automatically.
+
+\subsection{Dismantling Pennants and Reversing Heaps}
+\label{sec:binomial-dismantle}
+
+The \texttt{splitMin} operation requires converting the internal tree of the minimum pennant back
+into a binomial heap. This involves two key operations: dismantling a perfect binary tree into a
+reversed bit-list, and reversing that list back to standard form.
+
+\subsubsection{Reversed Binomial Heaps}
+
+To efficiently convert a binary tree to a binomial heap, we use an auxiliary data structure with
+\emph{decreasing} ranks:
+
+\begin{code}
+data ReversedBinomialHeap [rlen] a =
+        RNil
+      | RCons { rhd :: BinomialBit a
+              , rtl :: {bs : ReversedBinomialHeap a |
+                       not (isRNil bs) =>
+                         rank (rbhead bs) = rank rhd - 1}
+              }
+\end{code}
+
+This structure is the mirror image of \texttt{BinomialHeap}: consecutive bits differ by $-1$ in rank
+rather than $+1$. The refinement ensures that ranks decrease strictly by one at each step.
+
+\subsubsection{Dismantling a Binary Tree}
+
+The \texttt{dismantle} function converts a perfect binary tree into a reversed bit-list. At each
+level of the tree, it creates a \texttt{One} bit containing a pennant formed from the current
+node's value and left subtree:
+
+\begin{code}
+{-@ reflect dismantle @-}
+{-@ dismantle :: Ord a =>
+      t:BinTree a ->
+      {rh:ReversedBinomialHeap a | ValidDismantle t rh} @-}
+dismantle :: (Ord a) => BinTree a -> ReversedBinomialHeap a
+dismantle Empty = RNil
+dismantle (Bin m l r h) =
+  case r of
+    Empty -> RCons (One h (P m h l)) RNil
+    Bin _ _ _ hr ->
+      let rest = dismantle r
+          result = RCons (One h (P m h l)) rest
+       in result `withProof` lemma_rlast_preserved (One h (P m h l)) rest
+\end{code}
+
+The refinement predicate \texttt{ValidDismantle} ensures structural consistency:
+\begin{itemize}
+    \item If the tree has non-negative height, the result is non-empty.
+    \item The first bit's rank equals the tree's height.
+    \item The last bit's rank equals 0 (ensuring compatibility with \texttt{reverseToBinomialHeap}).
+\end{itemize}
+
+The proof uses \texttt{lemma\_rlast\_preserved}, which establishes that prepending a bit to a
+reversed heap preserves the property that the last bit has rank 0. This lemma is proven by
+structural induction on the reversed heap.
+
+\subsubsection{Reversing to Standard Form}
+
+The \texttt{reverseToBinomialHeap} function converts a reversed bit-list back to a standard
+binomial heap using an accumulator pattern:
+
+\begin{code}
+{-@ reverseToBinomialHeap ::
+      rh:{ReversedBinomialHeap a | ReversedEndsAtZero rh} ->
+      {h:BinomialHeap a | ValidReversed rh h}
+      / [rlen rh] @-}
+reverseToBinomialHeap :: ReversedBinomialHeap a -> BinomialHeap a
+reverseToBinomialHeap RNil = Nil
+reverseToBinomialHeap rh@(RCons b bs) =
+  case bs of
+    RNil -> Cons b Nil
+    RCons _ _ -> reverseAcc bs (Cons b Nil)
+                   `withProof` lemma_rlast_tail rh
+\end{code}
+
+The precondition \texttt{ReversedEndsAtZero} requires that the last bit has rank 0, ensuring the
+resulting heap starts at rank 0 (as required by \texttt{ValidReversed}). The termination metric
+\texttt{/ [rlen rh]} proves the function terminates by consuming the reversed list.
+
+\subsection{The \texttt{splitMin} Operation}
+\label{sec:binomial-splitmin}
+
+The \texttt{splitMin} operation combines all the previously discussed components to extract the
+minimum element and its remaining heap:
+
+\begin{code}
+{-@ splitMin ::
+      h:{BinomialHeap a | bRank h == 0} ->
+      MinView BinomialHeap a @-}
+splitMin :: (Ord a) => BinomialHeap a -> MinView BinomialHeap a
+splitMin heap =
+  if hasOnlyZeros heap
+    then EmptyView
+    else case extractMin heap of
+      (minPennant, restHeap) ->
+        let converted = case minPennant of
+              P _ 0 _ -> restHeap
+              P _ _ _ -> case restHeap of
+                Nil -> reverseToBinomialHeap (dismantle (bin minPennant))
+                Cons _ _ -> bAdd restHeap
+                             (reverseToBinomialHeap (dismantle (bin minPennant)))
+         in Min (root minPennant) converted
+\end{code}
+
+The operation proceeds as follows:
+\begin{enumerate}
+    \item Check if the heap is empty (only zeros). If so, return \texttt{EmptyView}.
+    \item Extract the minimum pennant and the remaining heap using \texttt{extractMin}.
+    \item If the pennant has height 0 (singleton), return it with the remaining heap.
+    \item Otherwise, dismantle the pennant's internal tree, reverse it to standard form, and merge
+          it with the remaining heap using \texttt{bAdd}.
+\end{enumerate}
+
+The refined return type \texttt{MinView BinomialHeap a} is defined in the shared infrastructure
+(\S\ref{sec:shared-infra}). The precondition \texttt{bRank h == 0} ensures the input heap starts
+at rank 0, which is maintained throughout by \texttt{extractMin},\\ \texttt{reverseToBinomialHeap},
+and \texttt{bAdd}.
+
+\subsection{Priority Queue Operations}
+\label{sec:binomial-pq-ops}
+
+The priority queue interface operations are implemented using the verified core operations,
+with additional rank-normalization through the \texttt{padWithZeros} helper:
+
+\begin{code}
+{-@ heapEmpty :: {h:BinomialHeap a | bRank h == 0} @-}
+heapEmpty :: BinomialHeap a
+heapEmpty = Nil
+
+{-@ heapInsert :: Ord a =>
+      a -> h:BinomialHeap a ->
+      {h':BinomialHeap a | bRank h' == 0} @-}
+heapInsert :: (Ord a) => a -> BinomialHeap a -> BinomialHeap a
+heapInsert x h = bAdd (Cons (One 0 (singleton x)) Nil) (padWithZeros h)
+
+{-@ heapMerge :: Ord a =>
+      h1:BinomialHeap a -> h2:BinomialHeap a ->
+      {h':BinomialHeap a | bRank h' == 0} @-}
+heapMerge :: (Ord a) => BinomialHeap a -> BinomialHeap a -> BinomialHeap a
+heapMerge h1 h2 = bAdd (padWithZeros h1) (padWithZeros h2)
+\end{code}
+
+The \texttt{padWithZeros} function ensures heaps start at rank 0 by prepending \texttt{Zero} bits
+as needed. While marked with \texttt{assume} in the current implementation, its correctness follows
+from prepending bits with strictly increasing ranks starting from 0.
+
+The \texttt{findMin} operation uses \texttt{minRootInHeap} when the heap is non-empty:
+
+\begin{code}
+safeFindMin :: (Ord a) => BinomialHeap a -> Maybe a
+safeFindMin h
+  | hasOnlyZeros h = Nothing
+  | otherwise = Just (minRootInHeap h)
+\end{code}
+
+This implementation pattern---checking \texttt{hasOnlyZeros} to enable calling
+\texttt{minRootInHeap}---is typical in the verification, where predicates in guards establish
+preconditions for subsequent operations.
+
+\section{Summary}
+\label{sec:verification-summary}
+
+This chapter demonstrated the verification of two priority queue implementations in LiquidHaskell,
+each presenting distinct challenges and verification techniques.
+
+For \textbf{leftist heaps} (\S\ref{sec:verify-leftist}), we achieved complete verification of all
+priority queue operations. The verification relies on refined data types that directly encode the
+heap property, leftist property, and rank correctness. The key challenge was proving that merge
+operations preserve these invariants, which required explicit lemmas for transitivity of lower bounds
+and bag equality preservation. The relatively simple structure of leftist heaps allowed for
+straightforward induction over the recursive tree structure.
+
+For \textbf{binomial heaps} (\S\ref{sec:verify-binomial}), we verified a more complex compositional
+structure consisting of three layers: perfect binary trees with left-ordering, pennants with minimum
+roots, and bit-lists representing the heap. Each layer required distinct refinements:
+\begin{itemize}
+    \item The \texttt{BinTree} layer enforces left-ordering and perfect balance through height constraints.
+    \item The \texttt{Pennant} layer ensures the minimum property by relating the root to the internal tree.
+    \item The \texttt{BinomialHeap} layer maintains rank consistency across the bit-list structure.
+    \item The \texttt{ReversedBinomialHeap} auxiliary structure enables efficient tree-to-heap conversion.
+\end{itemize}
+
+The binomial heap verification required careful tracking of ranks through bit-level arithmetic
+(\S\ref{sec:binomial-bits}), management of multiple heap representations (standard and reversed,
+\S\ref{sec:binomial-dismantle}), and coordination of multiple operations to implement \texttt{splitMin}
+(\S\ref{sec:binomial-splitmin}). The \texttt{dismantle} and \texttt{reverseToBinomialHeap} operations
+exemplify the compositional verification approach, where structural properties are maintained through
+lemmas about auxiliary functions (\texttt{lemma\_rlast\_preserved}, \texttt{lemma\_rlast\_tail}).
+
+Both developments leverage the shared logical infrastructure (\S\ref{sec:shared-infra}), particularly
+the \texttt{isLowerBound} predicate and the LiquidHaskell features introduced in Chapter~\ref{ch:lh}:
+measures, reflection, PLE, and termination metrics. The systematic use of refined data types ensures
+that structural invariants are maintained by construction, with the type system preventing the creation
+of invalid heap structures.
+
+The contrast between the two implementations illustrates important principles in verified functional
+programming: leftist heaps trade structural complexity for simpler verification, while binomial heaps
+achieve better theoretical worst-case complexity bounds at the cost of more intricate verification
+involving multiple data structures and auxiliary operations. Both approaches successfully use
+LiquidHaskell's refinement type system to achieve machine-checked correctness proofs that closely
+mirror the informal reasoning about these classic data structures from Chapter~\ref{ch:impl}.
 
 

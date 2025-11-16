@@ -267,7 +267,7 @@ zero = Zero 0
 {-@ reflect bHalfAdder @-}
 {-@ bHalfAdder :: b1: BinomialBit a
                -> b2: {b: BinomialBit a | rank b == rank b1}
-               -> (BinomialBit a, BinomialBit a)<{\s c -> rank s == rank b1 && rank c == rank b1 + 1}> @-}
+               -> ({s: BinomialBit a | rank s == rank b1}, {c: BinomialBit a | rank c == rank b1 + 1}) @-}
 bHalfAdder :: (Ord a) => BinomialBit a -> BinomialBit a -> (BinomialBit a, BinomialBit a)
 bHalfAdder b1 b2 = (bSum b1 b2, bCarry b1 b2)
 
