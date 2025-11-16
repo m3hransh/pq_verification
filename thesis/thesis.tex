@@ -57,7 +57,7 @@
   % but nice to keep consistent color if they appear in code comments, etc.)
   morekeywords=[2]{measure,invariant,reflect,assume,assert,termination,ple,qualif,axiomatize,
                     EmptyView, EmptyHeap, HeapNode, Min, Nil, Cons, Empty, Node, Just, Nothing,
-                    True, False, Bin, otherwise, P, Zero, One},
+                    True, False, Bin, otherwise, P, Zero, One, RNil, RCons},
 % Function names you want emphasized:
   morekeywords=[3]{insert,deleteMin,merge,put, bag,findMin, rank, lookup, empty, isEmpty, 
     splitMin, value, left, right, heapMerge, makeHeapNode, divide, bad, div, isLowerBound,
@@ -66,11 +66,15 @@
     lemma_heapMerge_case2, heapInsert, heapDeleteMin, heapSplit, safeHeapFindMin,
     NonEmp, isNonEmpty, range, fac, gcd, isEven, isOdd, patError, ok, minValue, restHeap,
     height, root, bin, link, pennant,oorder, zorder, bHalfAdder, bFullAdder, bSum, bCarry,
-    psize, add, addWithCarry, elems, bRank, isNil, bheight},
+    psize, add, addWithCarry, elems, bRank, isNil, bheight, safeFindMin, minRootInHeap, hasOnlyZeros,
+    bAdd, padWithZeros, singleton, extractMin, reverseToBinomialHeap, dismantle, reverseAcc,
+    lemma_rlast_tail, lemma_rlast_preserved, isRNil, rbhead, rlen, rhd, rtl, hd, tl, bhead, len,
+    pheight},
   % Typeclasses or types you want emphasized:
   morekeywords=[4]{Ord,Eq,Show,Functor,Monad,PriorityQueue, LeftistHeap, Nat, Pos, Int, Btwn, Bool,
                     Bag, PList, Heap, QED, Proof, Maybe, MinView, LeftistHeapBound,
-                    BinTree, Pennant, BinomialBit, BinomialHeap, Slist, BinTreeBound, BinTreeHeight},
+                    BinTree, Pennant, BinomialBit, BinomialHeap, Slist, BinTreeBound, BinTreeHeight,
+                    ReversedBinomialHeap},
   keywordstyle=\color{CodeKw}\bfseries,
   keywordstyle=[2]\color{LHKey}\bfseries,
   keywordstyle=[3]\color{FuncName}\bfseries,

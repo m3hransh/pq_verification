@@ -368,11 +368,11 @@ and perfect balance:
 \begin{code}
 type BinTreeBound a X = {b : BinTree a | isLowerBound X b}
 data BinTree a = Empty
-      | Bin { value  :: a
-            , left   :: BinTreeBound a value
-            , right  :: BinTreeHeight a (bheight left)
-            , height :: {h : Nat | h == 1 + bheight right}
-            }
+  | Bin { value  :: a
+        , left   :: BinTreeBound a value
+        , right  :: BinTreeHeight a (bheight left)
+        , height :: {h : Nat | h == 1 + bheight right}
+        }
 \end{code}
 \texttt{bheight} is a measure that computes the height of a \texttt{BinTree}:
 \begin{code}
@@ -391,11 +391,10 @@ enforces the \textbf{Minimum Property} from Chapter~\ref{ch:impl}---the root is 
 or equal to all elements in the internal tree:
 \begin{code}
 data Pennant a 
-  = P 
-  { root    :: a
-  , pheight :: Nat
-  , bin     :: {b : BinTreeBound a root | bheight b + 1 = pheight}
-  }
+  = P { root    :: a
+      , pheight :: Nat
+      , bin     :: {b : BinTreeBound a root | bheight b + 1 = pheight}
+      }
 \end{code}
 
 The refinement \texttt{bin :: \{b : BinTreeBound a root | ...\}} ensures \\ \texttt{isLowerBound root bin},
@@ -438,9 +437,10 @@ The core operation on pennants is merging two pennants of the same height \(h\) 
 The refined signature guarantees the height increase, ensures that all elements of the merging pennants exist, and, more importantly, that the resulting pennant preserves the invariants.
 \begin{code}
 {-@ reflect link @-}
-{-@ link :: Ord a => t1 : Pennant a
-    -> t2 : {Pennant a | pheight t2 == pheight t1}
-    -> {v : Pennant a | pheight v == pheight t1 + 1 && BagUnion t1 t2 v} @-}
+{-@ link :: Ord a => 
+      t1 : Pennant a
+   -> t2 : {Pennant a | pheight t2 == pheight t1}
+   -> {v : Pennant a | pheight v == pheight t1 + 1 && BagUnion t1 t2 v} @-}
 link :: (Ord a) => Pennant a -> Pennant a -> Pennant a
 link (P x1 h1 t1) (P x2 h2 t2)
   | x1 <= x2 
@@ -487,16 +487,18 @@ data type that directly encodes the rank-incrementing invariant:
 
 \begin{code}
 {-@ data BinomialHeap [len] a =
-        Nil
-      | Cons { hd :: BinomialBit a
-             , tl :: {bs : BinomialHeap a |
-                      not (heapIsEmpty bs) =>
-                        rank (bhead bs) = rank hd + 1}
-             }
+      Nil
+    | Cons { hd :: BinomialBit a
+           , tl :: {bs : BinomialHeap a |
+                    not (heapIsEmpty bs) =>
+                      rank (bhead bs) = rank hd + 1}
+           }
 @-}
 data BinomialHeap a
   = Nil
-  | Cons { hd :: BinomialBit a, tl :: BinomialHeap a }
+  | Cons { hd :: BinomialBit a
+         , tl :: BinomialHeap a
+         }
 \end{code}
 
 This refinement maintains the binomial heap's structural invariant: if the tail is non-empty, its
@@ -508,10 +510,11 @@ and \texttt{bhead} as measures to check emptiness and access the first bit:
 {-@ measure heapIsEmpty @-}
 heapIsEmpty :: BinomialHeap a -> Bool
 heapIsEmpty Nil = True
-heapIsEmpty _ = False
+heapIsEmpty _   = False
 
 {-@ measure bhead @-}
-{-@ bhead :: {b:BinomialHeap a | not (heapIsEmpty b)} -> BinomialBit a @-}
+{-@ bhead :: {b : BinomialHeap a | not (heapIsEmpty b)} 
+         -> BinomialBit a @-}
 bhead :: BinomialHeap a -> BinomialBit a
 bhead (Cons a _) = a
 \end{code}
@@ -535,14 +538,16 @@ implemented through bit-level addition. The \texttt{bSum} and \texttt{bCarry} fu
 basis of this arithmetic, with refined types guaranteeing rank-correctness:
 
 \begin{code}
-bSum :: b1:BinomialBit a -> 
-            b2:{BinomialBit a | rank b2 == rank b1} -> 
-            {b:BinomialBit a | rank b == rank b1}
+{-@ reflect bSum @-}
+{-@ bSum :: b1 : BinomialBit a 
+         -> b2 : {BinomialBit a | rank b2 == rank b1} 
+         -> {b : BinomialBit a | rank b == rank b1} @-}
 
-bCarry :: Ord a => 
-              b1:{BinomialBit a | rank b1 >= 0} -> 
-              b2:{BinomialBit a | rank b2 == rank b1} -> 
-              {b:BinomialBit a | rank b == rank b1 + 1}
+{-@ reflect bCarry @-}
+{-@ bCarry :: Ord a => 
+      b1 : {BinomialBit a | rank b1 >= 0} 
+   -> b2 : {BinomialBit a | rank b2 == rank b1} 
+   -> {b : BinomialBit a | rank b == rank b1 + 1} @-}
 \end{code}
 
 The \texttt{bSum} function produces a bit of the same rank as its inputs, while \texttt{bCarry}
@@ -552,16 +557,16 @@ logic, enabling LiquidHaskell to reason about their behavior during verification
 These primitives are composed into half-adders and full-adders:
 
 \begin{code}
-bHalfAdder :: b1:BinomialBit a ->
-                  b2:{BinomialBit a | rank b2 == rank b1} ->
-                  ({s:BinomialBit a | rank s == rank b1}, 
-                   {c:BinomialBit a | rank c == rank b1 + 1})
+bHalfAdder :: b1 : BinomialBit a
+           -> b2 : {BinomialBit a | rank b2 == rank b1}
+           -> ({s : BinomialBit a | rank s == rank b1}, 
+               {c : BinomialBit a | rank c == rank b1 + 1})
 
-bFullAdder :: b1:BinomialBit a ->
-                  b2:{BinomialBit a | rank b2 == rank b1} ->
-                  c:{BinomialBit a | rank c == rank b1} ->
-                  ({s:BinomialBit a | rank s == rank b1}, 
-                   {co:BinomialBit a | rank co == rank b1 + 1})
+bFullAdder :: b1 : BinomialBit a
+           -> b2 : {BinomialBit a | rank b2 == rank b1}
+           -> c  : {BinomialBit a | rank c == rank b1}
+           -> ({s : BinomialBit a | rank s == rank b1}, 
+               {co : BinomialBit a | rank co == rank b1 + 1})
 \end{code}
 
 The half-adder takes two bits at rank $r$ and produces a sum at rank $r$ and a carry at rank $r+1$.
@@ -580,11 +585,9 @@ The top-level \texttt{bAdd} function initiates the merge by calling \texttt{addW
 initial carry of \texttt{Zero 0}:
 
 \begin{code}
-bAdd :: h1:{BinomialHeap a | bRank h1 == 0} ->
-            h2:{BinomialHeap a | bRank h2 == 0} ->
-            BinomialHeap a 
-bAdd :: (Ord a) => BinomialHeap a -> BinomialHeap a -> BinomialHeap a
-bAdd xs ys = addWithCarry xs ys (Zero 0)
+bAdd :: h1 : {BinomialHeap a | bRank h1 == 0}
+     -> h2 : {BinomialHeap a | bRank h2 == 0}
+     -> BinomialHeap a
 \end{code}
 
 The precondition requires both input heaps to start at rank 0, which is maintained by all
@@ -593,17 +596,16 @@ priority queue operations through the \texttt{padWithZeros} helper.
 The \texttt{addWithCarry} function has a more complex refinement type:
 
 \begin{code}
-addWithCarry :: 
-      h1:BinomialHeap a ->
-      h2:{BinomialHeap a | 
-          (bRank h2 == bRank h1 || heapIsEmpty h1) 
-          || heapIsEmpty h2} ->
-      carry:{BinomialBit a | 
-             ((not (heapIsEmpty h1)) => rank carry == bRank h1)
-             && ((not (heapIsEmpty h2)) => rank carry == bRank h2)} ->
-      {b:BinomialHeap a | 
-       (not (heapIsEmpty b)) => rank (bhead b) == rank carry}
-      / [len h1, len h2]
+addWithCarry :: h1 : BinomialHeap a
+             -> h2 : {BinomialHeap a | 
+                      (bRank h2 == bRank h1 || heapIsEmpty h1) 
+                      || heapIsEmpty h2}
+             -> carry : {BinomialBit a | 
+                         ((not (heapIsEmpty h1)) => rank carry == bRank h1)
+                         && ((not (heapIsEmpty h2)) => rank carry == bRank h2)}
+             -> {b : BinomialHeap a | 
+                 (not (heapIsEmpty b)) => rank (bhead b) == rank carry}
+             / [len h1, len h2]
 \end{code}
 
 The key properties verified by LiquidHaskell are:
@@ -664,7 +666,8 @@ all pennant roots. Its refined type ensures it is only called on heaps containin
 \begin{code}
 {-@ reflect minRootInHeap @-}
 {-@ minRootInHeap :: Ord a =>
-      h:{BinomialHeap a | not (hasOnlyZeros h)} -> a @-}
+      h : {BinomialHeap a | not (hasOnlyZeros h)} 
+   -> a @-}
 minRootInHeap :: (Ord a) => BinomialHeap a -> a
 minRootInHeap (Cons (Zero _) bs) = minRootInHeap bs
 minRootInHeap (Cons (One _ (P r _ _)) Nil) = r
@@ -685,12 +688,12 @@ returning both the pennant and the remaining heap. Its refined type guarantees t
 pennant's root is indeed the minimum:
 
 \begin{code}
-{-@ extractMin :: (Ord a) =>
-      {h:BinomialHeap a | not (hasOnlyZeros h)} ->
-      ({p:Pennant a | minRootInHeap h == root p},
-       {h':BinomialHeap a |
-         (not (heapIsEmpty h') => rank (bhead h') == rank (bhead h))
-         && (bRank h == 0 => (heapIsEmpty h' || bRank h' == 0))}) @-}
+extractMin :: (Ord a) 
+   => {h : BinomialHeap a | not (hasOnlyZeros h)}
+   -> ({p : Pennant a | minRootInHeap h == root p},
+       {h' : BinomialHeap a |
+        (not (heapIsEmpty h') => rank (bhead h') == rank (bhead h))
+        && (bRank h == 0 => (heapIsEmpty h' || bRank h' == 0))})
 \end{code}
 
 The implementation traverses the bit list, comparing roots and recursively extracting from the
@@ -718,12 +721,12 @@ To efficiently convert a binary tree to a binomial heap, we use an auxiliary dat
 
 \begin{code}
 data ReversedBinomialHeap [rlen] a =
-        RNil
-      | RCons { rhd :: BinomialBit a
-              , rtl :: {bs : ReversedBinomialHeap a |
-                       not (isRNil bs) =>
-                         rank (rbhead bs) = rank rhd - 1}
-              }
+      RNil
+    | RCons { rhd :: BinomialBit a
+            , rtl :: {bs : ReversedBinomialHeap a |
+                     not (isRNil bs) =>
+                       rank (rbhead bs) = rank rhd - 1}
+            }
 \end{code}
 
 This structure is the mirror image of \texttt{BinomialHeap}: consecutive bits differ by $-1$ in rank
@@ -736,10 +739,8 @@ level of the tree, it creates a \texttt{One} bit containing a pennant formed fro
 node's value and left subtree:
 
 \begin{code}
-{-@ reflect dismantle @-}
-{-@ dismantle :: Ord a =>
-      t:BinTree a ->
-      {rh:ReversedBinomialHeap a | ValidDismantle t rh} @-}
+{-@ dismantle :: Ord a => t : BinTree a
+   -> {rh : ReversedBinomialHeap a | ValidDismantle t rh} @-}
 dismantle :: (Ord a) => BinTree a -> ReversedBinomialHeap a
 dismantle Empty = RNil
 dismantle (Bin m l r h) =
@@ -769,9 +770,9 @@ binomial heap using an accumulator pattern:
 
 \begin{code}
 {-@ reverseToBinomialHeap ::
-      rh:{ReversedBinomialHeap a | ReversedEndsAtZero rh} ->
-      {h:BinomialHeap a | ValidReversed rh h}
-      / [rlen rh] @-}
+      rh : {ReversedBinomialHeap a | ReversedEndsAtZero rh}
+   -> {h : BinomialHeap a | ValidReversed rh h}
+   / [rlen rh] @-}
 reverseToBinomialHeap :: ReversedBinomialHeap a -> BinomialHeap a
 reverseToBinomialHeap RNil = Nil
 reverseToBinomialHeap rh@(RCons b bs) =
@@ -793,8 +794,8 @@ minimum element and its remaining heap:
 
 \begin{code}
 {-@ splitMin ::
-      h:{BinomialHeap a | bRank h == 0} ->
-      MinView BinomialHeap a @-}
+      h : {BinomialHeap a | bRank h == 0}
+   -> MinView BinomialHeap a @-}
 splitMin :: (Ord a) => BinomialHeap a -> MinView BinomialHeap a
 splitMin heap =
   if hasOnlyZeros heap
@@ -831,19 +832,20 @@ The priority queue interface operations are implemented using the verified core 
 with additional rank-normalization through the \texttt{padWithZeros} helper:
 
 \begin{code}
-{-@ heapEmpty :: {h:BinomialHeap a | bRank h == 0} @-}
+{-@ heapEmpty :: {h : BinomialHeap a | bRank h == 0} @-}
 heapEmpty :: BinomialHeap a
 heapEmpty = Nil
 
-{-@ heapInsert :: Ord a =>
-      a -> h:BinomialHeap a ->
-      {h':BinomialHeap a | bRank h' == 0} @-}
+{-@ heapInsert :: Ord a => a 
+   -> h : BinomialHeap a
+   -> {h' : BinomialHeap a | bRank h' == 0} @-}
 heapInsert :: (Ord a) => a -> BinomialHeap a -> BinomialHeap a
 heapInsert x h = bAdd (Cons (One 0 (singleton x)) Nil) (padWithZeros h)
 
 {-@ heapMerge :: Ord a =>
-      h1:BinomialHeap a -> h2:BinomialHeap a ->
-      {h':BinomialHeap a | bRank h' == 0} @-}
+      h1 : BinomialHeap a 
+   -> h2 : BinomialHeap a
+   -> {h' : BinomialHeap a | bRank h' == 0} @-}
 heapMerge :: (Ord a) => BinomialHeap a -> BinomialHeap a -> BinomialHeap a
 heapMerge h1 h2 = bAdd (padWithZeros h1) (padWithZeros h2)
 \end{code}
