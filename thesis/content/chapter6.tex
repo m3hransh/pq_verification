@@ -1,7 +1,7 @@
 \chapter{Conclusion}
 \label{chap:conclusion}
 
-This thesis explored the verification of functional priority queue implementations in Haskell using \textsc{LiquidHaskell}, a lightweight refinement type system that integrates formal reasoning directly into the Haskell ecosystem. Our focus was on verifying essential invariants and correctness properties of two heap variants: the \emph{Leftist Heap} and the \emph{Binomial Heap}. 
+This thesis explored the verification of functional priority queue implementations in Haskell using \textsc{LiquidHaskell}, a lightweight refinement type system that integrates formal reasoning directly into the Haskell ecosystem. Our focus was on verifying essential invariants and correctness properties of two heap variants: the \emph{Leftist Heap} and the \emph{Binomial Heap}, each presenting distinct verification challenges and techniques. 
 
 \section{Summary of Contributions}
 \label{sec:contrib}
@@ -10,10 +10,10 @@ We presented verified implementations of key priority queue operations within Li
 Our main contributions can be summarized as follows:
 
 \begin{itemize}
-  \item We demonstrated how algebraic data types such as \texttt{BinTree} and \texttt{LeftistHeap} can be extended with refinement types to encode structural invariants, such as the heap-order property and rank relations.
-  \item We verified fundamental heap operations---including \texttt{merge}, \texttt{insert}, and \texttt{splitMin}---for the leftist heap, ensuring preservation of heap order and rank properties under recursive definitions.
-  \item We extended the framework to the binomial heap, focusing on mechanized proofs for the \texttt{Pennant} structure, the \texttt{merge} (link) function, and the rank-preserving bit-level addition (\texttt{bSum}, \texttt{bCarry}, \texttt{addWithCarry}).
-  \item We integrated these verifications with the LiquidHaskell toolchain, showing how reflection, measures, and termination metrics can encode reasoning directly at the type level.
+  \item We demonstrated how algebraic data types such as \texttt{BinTree}, \texttt{LeftistHeap}, and \texttt{Pennant} can be extended with refinement types to encode structural invariants, such as the heap-order property, rank relations, and perfect balance constraints.
+  \item We achieved complete verification of all priority queue operations---\texttt{empty}, \texttt{insert}, \texttt{merge}, \texttt{findMin}, and \texttt{splitMin}---for the leftist heap, ensuring preservation of heap order, leftist property, and rank correctness through explicit lemmas for lower-bound transitivity and bag equality.
+  \item We developed a comprehensive verification of the binomial heap's compositional structure, spanning three layers: perfect binary trees with left-ordering (\texttt{BinTree}), pennants with minimum roots (\texttt{Pennant}), and rank-consistent bit-lists (\texttt{BinomialHeap}). This included verification of bit-level arithmetic operations (\texttt{bSum}, \texttt{bCarry}, \texttt{bAdd}), tree dismantling (\texttt{dismantle}), heap reversal (\texttt{reverseToBinomialHeap}), and the complete \texttt{splitMin} operation with its auxiliary structures and lemmas.
+  \item We integrated these verifications with the LiquidHaskell toolchain, demonstrating how reflection, measures, PLE, and termination metrics can encode sophisticated reasoning directly at the type level, including structural recursion over multiple data structures and compositional properties across layered abstractions.
 \end{itemize}
 
 Together, these results demonstrate that non-trivial, purely functional data structures can be reasoned about in a practical way without leaving the Haskell ecosystem.
@@ -42,13 +42,13 @@ Despite its elegance, the verification process also revealed several limitations
 LiquidHaskell’s reflection mechanism is both powerful and restrictive. Any function that is used within a reflected definition must itself be reflected, which prevents direct reuse of many Haskell standard-library functions that are not reflected into the refinement logic. This recursive dependency forces the user to re-implement or re-reflect auxiliary functions, leading to significant boilerplate and occasional code duplication.
 
 \paragraph{Limited type-class support.}
-Although type classes are a fundamental abstraction in Haskell, their interaction with LiquidHaskell’s refinement logic remains fragile. In principle, one could encode general invariants for a class of data structures (e.g., a \texttt{VerifiedHeap} type class), but in practice the refinement checker struggles to generalize constraints and resolve overloaded instances. Consequently, many proofs must be carried out on a per-function basis, reducing modularity and reuse.
+Although type classes are a fundamental abstraction in Haskell, their interaction with LiquidHaskell’s refinement logic remains fragile. In principle, one could encode general invariants for a class of data structures (e.g., a \texttt{VerifiedHeap} type class), but in practice the refinement checker struggles to generalize constraints and resolve overloaded instances. Consequently, many proofs must be carried out on a per-function basis, reducing modularity and reuse.. This limitation was particularly evident in our binomial heap verification, where the multi-layered structure (\texttt{BinTree}, \texttt{Pennant}, \texttt{BinomialHeap}) required duplicated proof patterns across layers rather than shared abstractions
 
 \paragraph{Error reporting and debugging.}
 Error messages in LiquidHaskell can be difficult to interpret. Because LiquidHaskell translates annotated Haskell code into GHC Core and then re-interprets it in the SMT-based refinement logic, the resulting errors often refer to internal Core identifiers rather than the original Haskell source. This two-layer translation complicates the debugging process and makes it hard to locate the precise cause of a failed proof.
 
 \paragraph{The ``butterfly effect'' of verification.}
-Another practical issue is the high interdependence of reflected functions. Small logical inconsistencies or subtle changes in one definition can propagate widely, causing unrelated proofs to fail elsewhere. This “butterfly effect” makes large proof developments fragile and demands a disciplined structure of modular proofs and minimal reflection scopes.
+Another practical issue is the high interdependence of reflected functions. Small logical inconsistencies or subtle changes in one definition can propagate widely, causing unrelated proofs to fail elsewhere. This “butterfly effect” makes large proof developments fragile and demands a disciplined structure of modular proofs and minimal reflection scopes.. This was particularly evident in the binomial heap verification, where changes to bit-level operations or rank predicates required revisiting multiple layers of the compositional structure
 
 \paragraph{Limited higher-order reasoning.}
 LiquidHaskell’s logic is essentially first-order, and while it supports function values at the Haskell level, reasoning about higher-order properties (e.g., monotonicity of a function parameter) is not straightforward. This limits the expressiveness for verifying generic combinators or polymorphic invariants.
@@ -59,10 +59,11 @@ LiquidHaskell’s logic is essentially first-order, and while it supports functi
 There are several promising directions to extend this work:
 
 \begin{itemize}
-  \item \textbf{Improved abstraction mechanisms.} A richer integration of type classes or modular refinement signatures could improve code reuse across verified data structures.
+  \item \textbf{Improved abstraction mechanisms.} A richer integration of type classes or modular refinement signatures could improve code reuse across verified data structures, particularly for multi-layered compositional structures like binomial heaps.
   \item \textbf{Interoperability with other provers.} Linking LiquidHaskell with external proof assistants (e.g., exporting obligations to Coq or Lean) could allow deeper reasoning when needed, while keeping most proofs lightweight.
-  \item \textbf{Enhanced error reporting and tooling.} Improvements to LiquidHaskell’s diagnostic layer—mapping errors more directly to source expressions—would greatly improve usability for larger projects.
-  \item \textbf{Extending verification coverage.} Future work could complete the verification of \texttt{findMin} and \texttt{splitMin} for the binomial heap, and explore more advanced invariants such as amortized cost properties or verified performance bounds.
+  \item \textbf{Enhanced error reporting and tooling.} Improvements to LiquidHaskell's diagnostic layer—mapping errors more directly to source expressions—would greatly improve usability for larger projects, especially when working with complex compositional structures involving multiple data types and auxiliary operations.
+  \item \textbf{Verification of additional priority queue variants.} Future work could explore other heap structures such as Fibonacci heaps, pairing heaps, or skew heaps, comparing their verification complexity and examining how different structural invariants interact with LiquidHaskell's refinement logic.
+  \item \textbf{Performance and amortized analysis.} While this thesis focused on functional correctness, extending the verification to cover amortized complexity bounds and performance properties would provide stronger guarantees about the practical efficiency of verified implementations.
 \end{itemize}
 
 \section{Concluding Remarks}
@@ -70,5 +71,7 @@ There are several promising directions to extend this work:
 
 This thesis showed that LiquidHaskell offers a compelling compromise between expressiveness and practicality: it enables formal verification \emph{within} the host programming language, avoiding the steep learning curve and re-implementation overhead of traditional proof assistants. While the current ecosystem exhibits technical limitations—especially around reflection, type-class abstraction, and error feedback—its lightweight nature makes it uniquely suited for embedding correctness reasoning into everyday functional programming practice.
 
-Ultimately, the experience gained from verifying priority queues demonstrates that refinement types can bridge the gap between formal methods and real software engineering, turning correctness from a post-hoc assurance into a first-class component of functional design.
+The successful verification of both leftist heaps and binomial heaps demonstrates that LiquidHaskell can handle data structures of varying complexity: from the relatively straightforward tree-based leftist heaps to the intricate multi-layered compositional structure of binomial heaps with their bit-level arithmetic and multiple auxiliary operations. This range of examples illustrates the trade-offs between structural simplicity and verification complexity, showing that refinement types can effectively reason about both simple recursive structures and sophisticated compositional architectures.
+
+Ultimately, the experience gained from verifying these priority queues demonstrates that refinement types can bridge the gap between formal methods and real software engineering, turning correctness from a post-hoc assurance into a first-class component of functional design.
 
