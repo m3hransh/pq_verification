@@ -64,6 +64,32 @@ isLowerBound v (HeapNode x l r _) =
 
 By embedding these invariants directly into the type, \texttt{LiquidHaskell}'s verifier will ensure that any function constructing or modifying a \texttt{LeftistHeap} respects them.
 
+To illustrate how LiquidHaskell enforces these invariants, consider a valid leftist heap:
+
+\begin{code}
+validHeap :: LeftistHeap Int
+validHeap = HeapNode 1
+              (HeapNode 2 EmptyHeap EmptyHeap 1)
+              EmptyHeap
+              1
+\end{code}
+
+This heap passes verification because the heap property holds ($1 \le 2$),
+the leftist property holds ($\texttt{rrank right} = 0 \le 1 = \texttt{rrank left}$),
+and the rank is correct ($1 = 1 + 0$).
+
+In contrast, the following example fails LiquidHaskell verification:
+
+\begin{code}
+invalidHeap :: LeftistHeap Int
+invalidHeap = HeapNode 5
+                (HeapNode 2 EmptyHeap EmptyHeap 1)
+                EmptyHeap
+                1
+\end{code}
+
+LiquidHaskell rejects this because the heap property is violated: the parent value 5 is greater than the left child value 2, contradicting the refinement \texttt{left :: LeftistHeapBound a value} which requires \texttt{isLowerBound 5 (HeapNode 2 ...)}.
+
 Following the interface defined in Chapter~\ref{lst:pq}, we refine the types of the heap operations to ensure they maintain the invariants of the leftist heap.
 Unfortunately, due to limitations in \texttt{LiquidHaskell}'s current support for type classes,
 we cannot directly define the invariants for the \texttt{PriorityQueue} type class.
@@ -486,25 +512,47 @@ Rather than using LiquidHaskell's parameterized \texttt{PList} type, we define a
 data type that directly encodes the rank-incrementing invariant:
 
 \begin{code}
-{-@ data BinomialHeap [len] a =
-      Nil
-    | Cons { hd :: BinomialBit a
-           , tl :: {bs : BinomialHeap a |
-                    not (heapIsEmpty bs) =>
-                      rank (bhead bs) = rank hd + 1}
-           }
-@-}
-data BinomialHeap a
+data BinomialHeap [len] a 
   = Nil
   | Cons { hd :: BinomialBit a
-         , tl :: BinomialHeap a
+         , tl :: {bs : BinomialHeap a |
+                  not (heapIsEmpty bs) =>
+                    rank (bhead bs) = rank hd + 1}
          }
 \end{code}
 
 This refinement maintains the binomial heap's structural invariant: if the tail is non-empty, its
 first bit's rank must be exactly one more than the current bit's rank. The measure \texttt{len}
-provides a termination metric for recursive functions over heaps. We define \texttt{heapIsEmpty}
-and \texttt{bhead} as measures to check emptiness and access the first bit:
+provides a termination metric for recursive functions over heaps.
+
+To illustrate the rank-incrementing invariant, consider a valid binomial heap:
+
+\begin{code}
+validBH :: BinomialHeap Int
+validBH = Cons (Zero 0)
+                      (Cons (One 1 (P 3 1 (Bin 5 Empty Empty 0)))
+                        (Cons (Zero 2) Nil))
+\end{code}
+
+This heap satisfies the invariant: the bits have ranks 0, 1, and 2, increasing by exactly one at each step.
+The \texttt{One} bit at rank 1 contains a pennant of height 1, satisfying \texttt{pheight p == oorder}.
+
+In contrast, the following example fails verification:
+
+\begin{code}
+invalidBH :: BinomialHeap Int
+invalidBH = 
+  Cons (Zero 0)
+    (Cons (One 2 (P 3 2 (Bin 5 (Bin 7 Empty Empty 0)
+                           (Bin 6 Empty Empty 0) 1)))
+      Nil)
+\end{code}
+
+LiquidHaskell rejects this because the rank-incrementing invariant is violated: the first bit has rank 0,
+but the second bit has rank 2, contradicting the refinement \texttt{rank (bhead bs) = rank hd + 1} which
+requires the rank to increase by exactly one.
+
+We define \texttt{heapIsEmpty} and \texttt{bhead} as measures to check emptiness and access the first bit:
 
 \begin{code}
 {-@ measure heapIsEmpty @-}
@@ -538,16 +586,14 @@ implemented through bit-level addition. The \texttt{bSum} and \texttt{bCarry} fu
 basis of this arithmetic, with refined types guaranteeing rank-correctness:
 
 \begin{code}
-{-@ reflect bSum @-}
-{-@ bSum :: b1 : BinomialBit a 
-         -> b2 : {BinomialBit a | rank b2 == rank b1} 
-         -> {b : BinomialBit a | rank b == rank b1} @-}
+bSum :: b1 : BinomialBit a 
+  -> b2 : {BinomialBit a | rank b2 == rank b1} 
+  -> {b : BinomialBit a | rank b == rank b1} 
 
-{-@ reflect bCarry @-}
-{-@ bCarry :: Ord a => 
-      b1 : {BinomialBit a | rank b1 >= 0} 
-   -> b2 : {BinomialBit a | rank b2 == rank b1} 
-   -> {b : BinomialBit a | rank b == rank b1 + 1} @-}
+bCarry :: Ord a => 
+     b1 : {BinomialBit a | rank b1 >= 0} 
+  -> b2 : {BinomialBit a | rank b2 == rank b1} 
+  -> {b : BinomialBit a | rank b == rank b1 + 1} @-}
 \end{code}
 
 The \texttt{bSum} function produces a bit of the same rank as its inputs, while \texttt{bCarry}
@@ -558,15 +604,15 @@ These primitives are composed into half-adders and full-adders:
 
 \begin{code}
 bHalfAdder :: b1 : BinomialBit a
-           -> b2 : {BinomialBit a | rank b2 == rank b1}
-           -> ({s : BinomialBit a | rank s == rank b1}, 
-               {c : BinomialBit a | rank c == rank b1 + 1})
+  -> b2 : {BinomialBit a | rank b2 == rank b1}
+  -> ({s : BinomialBit a | rank s == rank b1}, 
+     {c : BinomialBit a | rank c == rank b1 + 1})
 
 bFullAdder :: b1 : BinomialBit a
-           -> b2 : {BinomialBit a | rank b2 == rank b1}
-           -> c  : {BinomialBit a | rank c == rank b1}
-           -> ({s : BinomialBit a | rank s == rank b1}, 
-               {co : BinomialBit a | rank co == rank b1 + 1})
+  -> b2 : {BinomialBit a | rank b2 == rank b1}
+  -> c  : {BinomialBit a | rank c == rank b1}
+  -> ({s : BinomialBit a | rank s == rank b1}, 
+     {co : BinomialBit a | rank co == rank b1 + 1})
 \end{code}
 
 The half-adder takes two bits at rank $r$ and produces a sum at rank $r$ and a carry at rank $r+1$.
